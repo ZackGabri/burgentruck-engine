@@ -26,18 +26,14 @@ fn main() -> Result<(), anyhow::Error> {
 
             "position" => match args.pop_front().unwrap_or("") {
                 "startpos" => {
-                    let args: String = Vec::from(args).join(" ");
-                    let mut split: VecDeque<&str> = args.split("moves").collect();
-                    let moves = split
-                        .pop_front()
-                        .map(|moves| moves.split_ascii_whitespace().map(|x| x.trim()));
-
                     pos = Chess::default();
 
-                    if let Some(moves) = moves {
+                    if args.pop_front() == Some("moves") {
+                        let moves = Vec::from(args).into_iter().map(|x| x.trim());
+
                         for m in moves {
                             let uci: UciMove = m.parse()?;
-                            let m = uci.to_move(&pos)?;
+                            let m = uci.to_move(&pos).unwrap();
 
                             pos.play_unchecked(m);
                         }
@@ -76,8 +72,26 @@ fn main() -> Result<(), anyhow::Error> {
             }
             "stop" => {}
 
-            "fen" => {
-                println!("{}", pos.board().board_fen());
+            "d" | "display" => {
+                let mut board: [[char; 8]; 8] = [['.'; 8]; 8];
+                pos.board().iter().for_each(|(square, piece)| {
+                    let (file, rank) = square.coords();
+                    board[rank as usize][file as usize] = piece.char();
+                });
+
+                board.reverse();
+
+                board.iter().for_each(|chunk| {
+                    println!(
+                        "{}",
+                        chunk
+                            .iter()
+                            .map(|c| format!("{c}"))
+                            .collect::<Vec<String>>()
+                            .join(" ")
+                    );
+                });
+                println!("Fen: {}", pos.board().board_fen());
             }
 
             "" => {}
