@@ -1,6 +1,6 @@
 use shakmaty::{ByColor, ByRole, Chess, Color, Move, Position};
 
-const DEFAULT_SEARCH_DEPTH: usize = 3;
+const DEFAULT_SEARCH_DEPTH: usize = 5;
 
 pub fn search(position: &Chess, depth: Option<usize>) -> Option<Move> {
     let depth = depth.unwrap_or(DEFAULT_SEARCH_DEPTH);
@@ -21,6 +21,17 @@ pub fn negamax(position: &Chess, depth: usize, ply: usize, best_move: &mut Optio
     let mut max = -69420;
 
     let moves = position.legal_moves();
+
+    if moves.is_empty() {
+        if position.is_check() {
+            // checkmate
+            return -69420 + ply as i32;
+        } else {
+            // stalemate
+            return 0;
+        }
+    }
+
     for mov in moves.into_iter() {
         let position = position.clone().play(mov).unwrap();
         let score = -negamax(&position, depth - 1, ply + 1, best_move);
