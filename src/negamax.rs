@@ -3,38 +3,33 @@ use shakmaty::{ByColor, ByRole, Chess, Color, Move, Position};
 const DEFAULT_SEARCH_DEPTH: usize = 3;
 
 pub fn search(position: &Chess, depth: Option<usize>) -> Option<Move> {
-    let moves = position.legal_moves();
+    let depth = depth.unwrap_or(DEFAULT_SEARCH_DEPTH);
 
-    let mut best_score = -69420;
     let mut best_move: Option<Move> = None;
+    let best_score = negamax(position, depth, 0, &mut best_move);
 
-    for mov in moves.into_iter() {
-        let position = position.clone().play(mov).unwrap();
-        let score = negamax(depth.unwrap_or(DEFAULT_SEARCH_DEPTH), position);
-
-        if score > best_score {
-            best_score = score;
-            let _ = best_move.insert(mov);
-        }
-    }
-
+    dbg!(best_score);
     dbg!(best_move)
 }
 
-pub fn negamax(depth: usize, position: Chess) -> i32 {
+pub fn negamax(position: &Chess, depth: usize, ply: usize, best_move: &mut Option<Move>) -> i32 {
     if depth == 0 {
-        return evaluate(&position);
+        return evaluate(position);
     }
 
-    let mut max = -1;
+    let is_root = ply == 0;
+    let mut max = -69420;
 
     let moves = position.legal_moves();
     for mov in moves.into_iter() {
         let position = position.clone().play(mov).unwrap();
-        let score = -negamax(depth - 1, position);
+        let score = -negamax(&position, depth - 1, ply + 1, best_move);
 
         if score > max {
             max = score;
+            if is_root {
+                let _ = best_move.insert(mov);
+            }
         }
     }
 
@@ -51,7 +46,7 @@ fn who2move_score(color: shakmaty::Color) -> i32 {
 pub fn evaluate(position: &Chess) -> i32 {
     let ByColor { white, black } = position.board().material();
 
-    count_material(white) - count_material(black)
+    (count_material(white) - count_material(black)) * who2move_score(position.turn())
 }
 
 fn count_material(pieces: ByRole<u8>) -> i32 {
