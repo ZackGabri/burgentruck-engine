@@ -38,6 +38,10 @@ pub fn negamax(
         return evaluate(position);
     }
 
+    if position.is_insufficient_material() {
+        return 0;
+    }
+
     let mut max = -69420;
     let moves = position.legal_moves();
 
