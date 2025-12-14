@@ -14,8 +14,7 @@ pub fn search(position: &Chess, depth: Option<usize>) -> Option<Move> {
     let duration = start.elapsed();
 
     println!(
-        "info depth {depth} score cp {} nodes {node_count} nps {} time {} pv {}",
-        best_score * 100,
+        "info depth {depth} score cp {best_score} nodes {node_count} nps {} time {} pv {}",
         (node_count as f64 / duration.as_secs_f64()) as usize,
         duration.as_millis(),
         best_line
@@ -81,13 +80,13 @@ pub fn evaluate(position: &Chess) -> i32 {
 }
 
 fn count_material(pieces: ByRole<u8>) -> i32 {
-    let mut count = 0;
+    let mut count: u32 = 0;
 
-    count += pieces.pawn;
-    count += pieces.bishop * 3;
-    count += pieces.knight * 3;
-    count += pieces.rook * 5;
-    count += pieces.queen * 9;
+    count += pieces.pawn as u32 * 100;
+    count += pieces.bishop as u32 * 300;
+    count += pieces.knight as u32 * 300;
+    count += pieces.rook as u32 * 500;
+    count += pieces.queen as u32 * 900;
 
     count as _
 }
