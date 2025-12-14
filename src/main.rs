@@ -4,6 +4,8 @@ use shakmaty::fen::Fen;
 use shakmaty::uci::UciMove;
 use shakmaty::{Chess, Position};
 
+mod negamax;
+
 fn main() -> Result<(), anyhow::Error> {
     let mut pos = Chess::default();
 
@@ -34,6 +36,7 @@ fn main() -> Result<(), anyhow::Error> {
                     if args.first().copied() == Some("moves") {
                         let moves = args.get(1..).unwrap_or_default();
 
+                        dbg!(moves);
                         for m in moves {
                             let uci: UciMove = m.trim().parse()?;
                             let m = uci.to_move(&pos).unwrap();
@@ -61,8 +64,10 @@ fn main() -> Result<(), anyhow::Error> {
             },
 
             ["go", _args @ ..] => {
-                let moves = pos.legal_moves();
-                let best_move = moves.first();
+                // let moves = pos.legal_moves();
+                // let best_move = moves.first();
+
+                let best_move = negamax::search(&pos, None);
 
                 if let Some(best_move) = best_move {
                     println!("bestmove {}", best_move.to_uci(pos.castles().mode()));
