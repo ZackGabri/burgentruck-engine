@@ -1,7 +1,11 @@
-use shakmaty::{ByColor, ByRole, Chess, Color, Move, Position};
+use shakmaty::{Chess, Move, Position};
+
+use std::sync::Arc;
+use std::sync::atomic::{AtomicI32, AtomicUsize, Ordering};
 use std::time::Instant;
 
 const DEFAULT_SEARCH_DEPTH: usize = 5;
+const THREAD_COUNT: usize = 1;
 
 pub fn search(position: &Chess, depth: Option<usize>) -> Option<Move> {
     let depth = depth.unwrap_or(DEFAULT_SEARCH_DEPTH);
@@ -35,7 +39,7 @@ pub fn negamax(
     node_count: &mut usize,
 ) -> i32 {
     if depth == 0 {
-        return evaluate(position);
+        return crate::eval::evaluate(position);
     }
 
     if position.is_insufficient_material() {
@@ -55,42 +59,84 @@ pub fn negamax(
         }
     }
 
-    for mov in moves.into_iter() {
-        let position = position.clone().play(mov).unwrap();
-        let score = -negamax(&position, depth - 1, ply + 1, best_line, node_count);
+    // if we're in root then do multithreading, otherwise run normal to avoid recursive threads
+    if ply == 0 && THREAD_COUNT > 1 {
+        let mut threads = Vec::new();
 
-        if score > max {
-            max = score;
-            let _ = best_line[ply].insert(mov);
+        let moves = Arc::new(moves);
+        let next = Arc::new(AtomicUsize::new(0));
+        let shared_node_count = Arc::new(AtomicUsize::new(0));
+        let shared_best = Arc::new(AtomicUsize::new(0));
+        let shared_max = Arc::new(AtomicI32::new(-69420));
+
+        for _ in 0..THREAD_COUNT {
+            let moves_clone = moves.clone();
+            let next_clone = next.clone();
+            let position_clone = position.clone();
+            let node_count_clone = shared_node_count.clone();
+            let max_clone = shared_max.clone();
+            let best_clone = shared_best.clone();
+
+            threads.push(std::thread::spawn(move || {
+                let mut thread_nodes = 0;
+
+                // (index, score)
+                let mut thread_best: (usize, i32) = (0, -69420);
+                loop {
+                    let i = next_clone.clone().fetch_add(1, Ordering::Relaxed);
+                    if i >= moves_clone.len() {
+                        break;
+                    }
+
+                    let move_to_search = moves_clone[i];
+                    let position = position_clone.clone().play(move_to_search).unwrap();
+
+                    let mut best_line: Vec<Option<Move>> = vec![None; depth];
+
+                    let score = -negamax(
+                        &position,
+                        depth - 1,
+                        ply + 1,
+                        &mut best_line,
+                        &mut thread_nodes,
+                    );
+
+                    if score > thread_best.1 {
+                        thread_best = (i, score);
+                    }
+
+                    thread_nodes += 1;
+                }
+
+                node_count_clone.fetch_add(thread_nodes, Ordering::Relaxed);
+                if thread_best.1 > (*max_clone).load(Ordering::Relaxed) {
+                    best_clone.store(thread_best.0, Ordering::Relaxed);
+                    max_clone.store(thread_best.1, Ordering::Relaxed);
+                }
+            }));
         }
 
-        *node_count += 1;
+        // wait for all threads to finish
+        for thread in threads {
+            thread.join().unwrap();
+        }
+
+        max = shared_max.load(Ordering::Relaxed);
+        *node_count = shared_node_count.load(Ordering::Relaxed);
+        best_line[0] = Some(moves[shared_best.load(Ordering::Relaxed)]);
+    } else {
+        for mov in moves.into_iter() {
+            let position = position.clone().play(mov).unwrap();
+            let score = -negamax(&position, depth - 1, ply + 1, best_line, node_count);
+
+            if score > max {
+                max = score;
+                let _ = best_line[ply].insert(mov);
+            }
+
+            *node_count += 1;
+        }
     }
 
     max
-}
-
-fn who2move_score(color: shakmaty::Color) -> i32 {
-    match color {
-        Color::White => 1,
-        Color::Black => -1,
-    }
-}
-
-pub fn evaluate(position: &Chess) -> i32 {
-    let ByColor { white, black } = position.board().material();
-
-    (count_material(white) - count_material(black)) * who2move_score(position.turn())
-}
-
-fn count_material(pieces: ByRole<u8>) -> i32 {
-    let mut count: u32 = 0;
-
-    count += pieces.pawn as u32 * 100;
-    count += pieces.bishop as u32 * 300;
-    count += pieces.knight as u32 * 300;
-    count += pieces.rook as u32 * 500;
-    count += pieces.queen as u32 * 900;
-
-    count as _
 }

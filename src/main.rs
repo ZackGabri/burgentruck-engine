@@ -4,6 +4,7 @@ use shakmaty::fen::Fen;
 use shakmaty::uci::UciMove;
 use shakmaty::{Chess, Position};
 
+mod eval;
 mod negamax;
 
 fn main() -> Result<(), anyhow::Error> {
