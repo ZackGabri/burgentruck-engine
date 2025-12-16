@@ -6,6 +6,7 @@ use shakmaty::{Chess, Position};
 
 mod eval;
 mod negamax;
+mod transposition_table;
 
 fn main() -> Result<(), anyhow::Error> {
     let mut pos = Chess::default();

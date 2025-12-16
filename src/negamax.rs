@@ -1,5 +1,8 @@
+use shakmaty::zobrist::ZobristHash;
 use shakmaty::{Chess, Move, Position};
 use std::time::Instant;
+
+use crate::transposition_table::{TABLE_SIZE, TTEntry, get_ttindex};
 
 const DEFAULT_SEARCH_DEPTH: usize = 5;
 
@@ -28,17 +31,19 @@ pub fn search(position: &Chess, depth: Option<usize>) -> Option<Move> {
     dbg!(negamax.best_line[0])
 }
 
-// struct for shared data between every negamax run
+// struct for shared data between every negamax call
 pub struct Negamax {
     node_count: usize,
     best_line: Vec<Option<Move>>,
+    transposition_table: Box<[TTEntry]>,
 }
 
 impl Negamax {
     fn new() -> Self {
         Self {
             node_count: 0,
-            best_line: Vec::new(),
+            best_line: vec![None; 100],
+            transposition_table: vec![TTEntry::default(); TABLE_SIZE].into_boxed_slice(),
         }
     }
 
@@ -49,6 +54,15 @@ impl Negamax {
 
         if position.is_insufficient_material() {
             return 0;
+        }
+
+        let hash = position.zobrist_hash(shakmaty::EnPassantMode::Legal);
+        let tt_index = get_ttindex(hash);
+        let tt_entry = &self.transposition_table[tt_index];
+        let replace_tt = tt_entry.depth < depth || tt_entry.hash != hash;
+
+        if tt_entry.depth >= depth && tt_entry.hash == hash {
+            return tt_entry.score;
         }
 
         let mut max = -69420;
@@ -66,7 +80,7 @@ impl Negamax {
 
         for mov in moves.into_iter() {
             let position = position.clone().play(mov).unwrap();
-            let score = self.negamax(&position, depth - 1, ply + 1);
+            let score = -self.negamax(&position, depth - 1, ply + 1);
 
             if score > max {
                 max = score;
@@ -74,6 +88,14 @@ impl Negamax {
             }
 
             self.node_count += 1;
+        }
+
+        if replace_tt {
+            self.transposition_table[tt_index] = TTEntry {
+                hash,
+                depth,
+                score: max,
+            };
         }
 
         max
