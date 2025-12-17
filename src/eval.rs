@@ -2,8 +2,9 @@ use shakmaty::{ByColor, ByRole, Chess, Color, Position};
 
 pub fn evaluate(position: &Chess) -> i32 {
     let ByColor { white, black } = position.board().material();
+    let who2move = who2move_score(position.turn());
 
-    (count_material(white) - count_material(black)) * who2move_score(position.turn())
+    ((count_material(white) - count_material(black)) * who2move) + rand::random_range(-10..=10)
 }
 
 fn who2move_score(color: shakmaty::Color) -> i32 {

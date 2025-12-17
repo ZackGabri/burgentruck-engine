@@ -1,3 +1,5 @@
+#![cfg_attr(debug_assertions, allow(unused))]
+
 use std::io::{self, Write};
 
 use shakmaty::fen::Fen;
