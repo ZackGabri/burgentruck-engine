@@ -1,55 +1,18 @@
 use shakmaty::zobrist::ZobristHash;
 use shakmaty::{Chess, Move, MoveList, Position};
-use std::time::Instant;
 
 use crate::history::MoveHistory;
 use crate::transposition_table::{TABLE_SIZE, TTBound, TTEntry, get_ttindex};
 
-const DEFAULT_SEARCH_DEPTH: usize = 7;
-
-pub fn search(
-    position: &Chess,
-    max_depth: Option<usize>,
-    history: Option<&MoveHistory>,
-) -> Option<Move> {
-    let max_depth = max_depth.unwrap_or(DEFAULT_SEARCH_DEPTH);
-    let default_history = MoveHistory::default();
-    let history = history.unwrap_or(&default_history);
-
-    let mut negamax = Negamax::new();
-    println!("info history size {:?}", history.index);
-
-    let start = Instant::now();
-    for depth in 0..=max_depth {
-        let best_score = negamax.negamax(position, history, depth, 0, -69420, 69420);
-        let duration = start.elapsed();
-
-        println!(
-            "info depth {depth} score cp {best_score} nodes {} nps {} time {} pv {}",
-            negamax.node_count,
-            (negamax.node_count as f64 / duration.as_secs_f64()) as usize,
-            duration.as_millis(),
-            negamax
-                .best_line
-                .iter()
-                .filter_map(|x| x.map(|x| x.to_uci(position.castles().mode()).to_string()))
-                .collect::<Vec<String>>()
-                .join(" ")
-        );
-    }
-
-    dbg!(negamax.best_line[0])
-}
-
 // struct for shared data between every negamax call
 pub struct Negamax {
-    node_count: usize,
-    best_line: Vec<Option<Move>>,
+    pub node_count: usize,
+    pub best_line: Vec<Option<Move>>,
     transposition_table: Box<[TTEntry]>,
 }
 
 impl Negamax {
-    fn new() -> Self {
+    pub fn new() -> Self {
         Self {
             node_count: 0,
             best_line: vec![None; 100],
@@ -57,7 +20,7 @@ impl Negamax {
         }
     }
 
-    fn negamax(
+    pub fn negamax(
         &mut self,
         position: &Chess,
         history: &MoveHistory,
@@ -169,7 +132,7 @@ impl Negamax {
     }
 
     fn quiescence(&mut self, position: &Chess, alpha: &mut i32, beta: i32) -> i32 {
-        let static_eval = crate::eval::evaluate(position);
+        let static_eval = super::eval::evaluate(position);
 
         let mut best_value = static_eval;
         if best_value >= beta {

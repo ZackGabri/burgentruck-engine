@@ -6,9 +6,8 @@ use shakmaty::{Chess, Position};
 
 use crate::history::MoveHistory;
 
-mod eval;
 mod history;
-mod negamax;
+mod search;
 mod transposition_table;
 
 fn main() -> Result<(), anyhow::Error> {
@@ -81,10 +80,22 @@ fn main() -> Result<(), anyhow::Error> {
                 _ => {}
             },
 
-            ["go", _args @ ..] => {
-                // let moves = pos.legal_moves();
-                // let best_move = moves.first();
-                let best_move = negamax::search(&pos, None, Some(&history.clone()));
+            ["go", "nodes", val] => {
+                let best_move = search::search(&pos, Some(&history), None, val.parse().ok());
+
+                if let Some(best_move) = best_move {
+                    println!("bestmove {}", best_move.to_uci(pos.castles().mode()));
+                }
+            }
+            ["go", "depth", val] => {
+                let best_move = search::search(&pos, Some(&history), val.parse().ok(), None);
+
+                if let Some(best_move) = best_move {
+                    println!("bestmove {}", best_move.to_uci(pos.castles().mode()));
+                }
+            }
+            ["go", ..] => {
+                let best_move = search::search(&pos, Some(&history), None, None);
 
                 if let Some(best_move) = best_move {
                     println!("bestmove {}", best_move.to_uci(pos.castles().mode()));
