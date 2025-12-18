@@ -15,13 +15,13 @@ fn who2move_score(color: shakmaty::Color) -> i32 {
 }
 
 fn count_material(pieces: ByRole<u8>) -> i32 {
-    let mut count: u32 = 0;
+    let mut count: i32 = 0;
 
-    count += pieces.pawn as u32 * 100;
-    count += pieces.bishop as u32 * 300;
-    count += pieces.knight as u32 * 300;
-    count += pieces.rook as u32 * 500;
-    count += pieces.queen as u32 * 900;
+    count += pieces.pawn as i32 * 100;
+    count += pieces.bishop as i32 * 300;
+    count += pieces.knight as i32 * 300;
+    count += pieces.rook as i32 * 500;
+    count += pieces.queen as i32 * 900;
 
-    count as _
+    count
 }
