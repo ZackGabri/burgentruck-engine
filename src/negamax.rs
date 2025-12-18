@@ -1,5 +1,5 @@
 use shakmaty::zobrist::ZobristHash;
-use shakmaty::{Chess, Move, Position};
+use shakmaty::{Chess, Move, MoveList, Position};
 use std::time::Instant;
 
 use crate::history::MoveHistory;
@@ -9,10 +9,10 @@ const DEFAULT_SEARCH_DEPTH: usize = 7;
 
 pub fn search(
     position: &Chess,
-    depth: Option<usize>,
+    max_depth: Option<usize>,
     history: Option<&MoveHistory>,
 ) -> Option<Move> {
-    let depth = depth.unwrap_or(DEFAULT_SEARCH_DEPTH);
+    let max_depth = max_depth.unwrap_or(DEFAULT_SEARCH_DEPTH);
     let default_history = MoveHistory::default();
     let history = history.unwrap_or(&default_history);
 
@@ -20,21 +20,23 @@ pub fn search(
     println!("info history size {:?}", history.index);
 
     let start = Instant::now();
-    let best_score = negamax.negamax(position, history, depth, 0, -69420, 69420);
-    let duration = start.elapsed();
+    for depth in 0..=max_depth {
+        let best_score = negamax.negamax(position, history, depth, 0, -69420, 69420);
+        let duration = start.elapsed();
 
-    println!(
-        "info depth {depth} score cp {best_score} nodes {} nps {} time {} pv {}",
-        negamax.node_count,
-        (negamax.node_count as f64 / duration.as_secs_f64()) as usize,
-        duration.as_millis(),
-        negamax
-            .best_line
-            .iter()
-            .filter_map(|x| x.map(|x| x.to_uci(position.castles().mode()).to_string()))
-            .collect::<Vec<String>>()
-            .join(" ")
-    );
+        println!(
+            "info depth {depth} score cp {best_score} nodes {} nps {} time {} pv {}",
+            negamax.node_count,
+            (negamax.node_count as f64 / duration.as_secs_f64()) as usize,
+            duration.as_millis(),
+            negamax
+                .best_line
+                .iter()
+                .filter_map(|x| x.map(|x| x.to_uci(position.castles().mode()).to_string()))
+                .collect::<Vec<String>>()
+                .join(" ")
+        );
+    }
 
     dbg!(negamax.best_line[0])
 }
@@ -105,7 +107,7 @@ impl Negamax {
         }
 
         let mut max = -69420;
-        let moves = position.legal_moves();
+        let mut moves = position.legal_moves();
 
         if moves.is_empty() {
             if position.is_check() {
@@ -116,6 +118,8 @@ impl Negamax {
                 return 0;
             }
         }
+
+        self.sort_moves(&mut moves, ply);
 
         for mov in moves.into_iter() {
             let position = position.clone().play(mov).unwrap();
@@ -131,7 +135,8 @@ impl Negamax {
 
             if score > max {
                 max = score;
-                let _ = self.best_line[ply].insert(mov);
+
+                self.best_line[ply] = Some(mov);
 
                 if score > alpha {
                     alpha = score;
@@ -192,5 +197,13 @@ impl Negamax {
         }
 
         best_value
+    }
+
+    fn sort_moves(&self, moves: &mut MoveList, ply: usize) {
+        if let Some(best) = self.best_line[ply]
+            && let Some(best_move_index) = moves.iter().position(|m| *m == best)
+        {
+            moves.swap(0, best_move_index);
+        }
     }
 }
