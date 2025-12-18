@@ -65,7 +65,7 @@ impl Negamax {
         beta: i32,
     ) -> i32 {
         if depth == 0 {
-            return crate::eval::evaluate(position);
+            return self.quiescence(position, alpha, beta);
         }
 
         if position.is_insufficient_material() {
@@ -161,5 +161,37 @@ impl Negamax {
         }
 
         max
+    }
+
+    pub fn quiescence(&mut self, position: &Chess, mut alpha: i32, beta: i32) -> i32 {
+        let static_eval = crate::eval::evaluate(position);
+
+        let mut best_value = static_eval;
+        if best_value >= beta {
+            return best_value;
+        }
+        if best_value > alpha {
+            alpha = best_value;
+        }
+
+        let captures = position.capture_moves();
+        for capture in captures {
+            let position = position.clone().play(capture).unwrap();
+            let score = -self.quiescence(&position, -beta, -alpha);
+
+            if score >= beta {
+                return score;
+            }
+            if score > best_value {
+                best_value = score;
+            }
+            if score > alpha {
+                alpha = score;
+            }
+
+            self.node_count += 1;
+        }
+
+        best_value
     }
 }
