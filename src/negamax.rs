@@ -2,17 +2,25 @@ use shakmaty::zobrist::ZobristHash;
 use shakmaty::{Chess, Move, Position};
 use std::time::Instant;
 
+use crate::history::MoveHistory;
 use crate::transposition_table::{TABLE_SIZE, TTBound, TTEntry, get_ttindex};
 
-const DEFAULT_SEARCH_DEPTH: usize = 6;
+const DEFAULT_SEARCH_DEPTH: usize = 7;
 
-pub fn search(position: &Chess, depth: Option<usize>) -> Option<Move> {
+pub fn search(
+    position: &Chess,
+    depth: Option<usize>,
+    history: Option<&MoveHistory>,
+) -> Option<Move> {
     let depth = depth.unwrap_or(DEFAULT_SEARCH_DEPTH);
+    let default_history = MoveHistory::default();
+    let history = history.unwrap_or(&default_history);
 
     let mut negamax = Negamax::new();
+    println!("info history size {:?}", history.index);
 
     let start = Instant::now();
-    let best_score = negamax.negamax(position, depth, 0, -69420, 69420);
+    let best_score = negamax.negamax(position, history, depth, 0, -69420, 69420);
     let duration = start.elapsed();
 
     println!(
@@ -50,6 +58,7 @@ impl Negamax {
     fn negamax(
         &mut self,
         position: &Chess,
+        history: &MoveHistory,
         depth: usize,
         ply: usize,
         mut alpha: i32,
@@ -65,6 +74,16 @@ impl Negamax {
 
         let original_alpha = alpha;
         let hash = position.zobrist_hash(shakmaty::EnPassantMode::Legal);
+
+        let mut history = *history;
+        history.push_hash(hash);
+
+        // threefold detection
+        let count = history.count_item(&hash);
+        if count >= 2 && ply > 0 {
+            return 0;
+        }
+
         let tt_index = get_ttindex(hash);
         let tt_entry = &self.transposition_table[tt_index];
         let replace_tt = tt_entry.depth < depth || tt_entry.hash != hash;
@@ -100,7 +119,14 @@ impl Negamax {
 
         for mov in moves.into_iter() {
             let position = position.clone().play(mov).unwrap();
-            let score = -self.negamax(&position, depth - 1, ply + 1, -beta, -alpha);
+            let score = -self.negamax(
+                &position,
+                &history.clone(),
+                depth - 1,
+                ply + 1,
+                -beta,
+                -alpha,
+            );
             self.node_count += 1;
 
             if score > max {

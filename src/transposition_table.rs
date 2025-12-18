@@ -1,7 +1,7 @@
 use shakmaty::zobrist::Zobrist64;
 
 pub const TABLE_SIZE: usize = 1_usize << 22;
-type TTEntryHashSize = Zobrist64;
+pub type TTHash = Zobrist64;
 
 #[derive(Clone)]
 pub enum TTBound {
@@ -12,7 +12,7 @@ pub enum TTBound {
 
 #[derive(Clone)]
 pub struct TTEntry {
-    pub hash: TTEntryHashSize,
+    pub hash: TTHash,
     pub bound: TTBound,
     pub depth: usize,
     pub score: i32,
@@ -29,6 +29,6 @@ impl Default for TTEntry {
     }
 }
 
-pub fn get_ttindex(hash: TTEntryHashSize) -> usize {
+pub fn get_ttindex(hash: TTHash) -> usize {
     (hash.0 as usize) & (TABLE_SIZE - 1)
 }

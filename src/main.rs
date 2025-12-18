@@ -1,12 +1,13 @@
-#![cfg_attr(debug_assertions, allow(unused))]
-
 use std::io::{self, Write};
 
 use shakmaty::fen::Fen;
 use shakmaty::uci::UciMove;
 use shakmaty::{Chess, Position};
 
+use crate::history::MoveHistory;
+
 mod eval;
+mod history;
 mod negamax;
 mod transposition_table;
 
@@ -15,6 +16,7 @@ fn main() -> Result<(), anyhow::Error> {
 
     let stdin = io::stdin();
     let mut stdout = io::stdout();
+    let mut history = MoveHistory::new();
 
     loop {
         let mut line = String::new();
@@ -35,6 +37,7 @@ fn main() -> Result<(), anyhow::Error> {
             ["position"] => {}
             ["position", pos_type, args @ ..] => match *pos_type {
                 "startpos" => {
+                    history.reset();
                     pos = Chess::default();
 
                     if args.first().copied() == Some("moves") {
@@ -46,15 +49,22 @@ fn main() -> Result<(), anyhow::Error> {
                             let m = uci.to_move(&pos).unwrap();
 
                             pos.play_unchecked(m);
+                            history.push_position(&pos);
+                        }
+                        if !moves.is_empty() {
+                            history.pop(); // remove last position to avoid doubling it when running negamax
                         }
                     }
                 }
                 "fen" => {
+                    history.reset();
+
                     let args: String = args.join(" ");
                     let split: Vec<&str> = args.split("moves").collect();
 
                     let fen: Fen = split.first().copied().unwrap_or_default().parse()?;
                     pos = fen.into_position(pos.castles().mode())?;
+                    history.push_position(&pos);
 
                     let moves = split.get(1..).unwrap_or_default();
                     for m in moves {
@@ -62,6 +72,10 @@ fn main() -> Result<(), anyhow::Error> {
                         let m = uci.to_move(&pos)?;
 
                         pos.play_unchecked(m);
+                        history.push_position(&pos);
+                    }
+                    if !moves.is_empty() {
+                        history.pop(); // remove last position to avoid doubling it when running negamax
                     }
                 }
                 _ => {}
@@ -70,8 +84,7 @@ fn main() -> Result<(), anyhow::Error> {
             ["go", _args @ ..] => {
                 // let moves = pos.legal_moves();
                 // let best_move = moves.first();
-
-                let best_move = negamax::search(&pos, None);
+                let best_move = negamax::search(&pos, None, Some(&history.clone()));
 
                 if let Some(best_move) = best_move {
                     println!("bestmove {}", best_move.to_uci(pos.castles().mode()));
