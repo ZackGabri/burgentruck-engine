@@ -118,7 +118,7 @@ impl Negamax {
             }
 
             if score >= beta {
-                return max;
+                break;
             }
         }
 
@@ -154,12 +154,7 @@ impl Negamax {
         }
 
         let mut captures = position.capture_moves();
-        captures.sort_by_key(|m| {
-            let attacker = get_piece_value(m.role());
-            let victim = get_piece_value(m.capture().unwrap_or(shakmaty::Role::Pawn));
-
-            -(victim * 10 - attacker)
-        });
+        self.sort_captures(&mut captures);
 
         for capture in captures {
             let position = position.clone().play(capture).unwrap();
@@ -181,20 +176,24 @@ impl Negamax {
     }
 
     fn sort_moves(&self, moves: &mut MoveList, ply: usize) {
-        moves.sort_by_key(|m| {
-            if let Some(victim) = m.capture() {
-                let attacker = get_piece_value(m.role());
-                let victim = get_piece_value(victim);
-                -(victim * 10 - attacker)
-            } else {
-                100000 // this makes all captures show up first
-            }
-        });
+        self.sort_captures(moves);
 
         if let Some(best) = self.best_line[ply]
             && let Some(best_move_index) = moves.iter().position(|m| *m == best)
         {
             moves.swap(0, best_move_index);
         }
+    }
+
+    fn sort_captures(&self, moves: &mut MoveList) {
+        moves.sort_by_key(|m| {
+            if let Some(victim) = m.capture() {
+                let attacker = get_piece_value(m.role());
+                let victim = get_piece_value(victim);
+                -(victim * 10 - attacker)
+            } else {
+                100000 // aka show all normal moves last
+            }
+        });
     }
 }
