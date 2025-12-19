@@ -3,6 +3,7 @@ use shakmaty::{Chess, Move, MoveList, Position};
 
 use crate::engine_options;
 use crate::history::MoveHistory;
+use crate::search::eval::get_piece_value;
 use crate::transposition_table::{TTBound, TTEntry, get_ttindex};
 
 // struct for shared data between every negamax call
@@ -152,7 +153,14 @@ impl Negamax {
             *alpha = best_value;
         }
 
-        let captures = position.capture_moves();
+        let mut captures = position.capture_moves();
+        captures.sort_by_key(|m| {
+            let attacker = get_piece_value(m.role());
+            let victim = get_piece_value(m.capture().unwrap_or(shakmaty::Role::Pawn));
+
+            -(victim * 10 - attacker)
+        });
+
         for capture in captures {
             let position = position.clone().play(capture).unwrap();
             let score = -self.quiescence(&position, &mut -beta, -*alpha);
@@ -173,6 +181,16 @@ impl Negamax {
     }
 
     fn sort_moves(&self, moves: &mut MoveList, ply: usize) {
+        moves.sort_by_key(|m| {
+            if let Some(victim) = m.capture() {
+                let attacker = get_piece_value(m.role());
+                let victim = get_piece_value(victim);
+                -(victim * 10 - attacker)
+            } else {
+                100000 // this makes all captures show up first
+            }
+        });
+
         if let Some(best) = self.best_line[ply]
             && let Some(best_move_index) = moves.iter().position(|m| *m == best)
         {
