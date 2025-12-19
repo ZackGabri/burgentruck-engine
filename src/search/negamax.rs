@@ -1,22 +1,32 @@
 use shakmaty::zobrist::ZobristHash;
 use shakmaty::{Chess, Move, MoveList, Position};
 
+use crate::engine_options;
 use crate::history::MoveHistory;
-use crate::transposition_table::{TABLE_SIZE, TTBound, TTEntry, get_ttindex};
+use crate::transposition_table::{TTBound, TTEntry, get_ttindex};
 
 // struct for shared data between every negamax call
 pub struct Negamax {
     pub node_count: usize,
     pub best_line: Vec<Option<Move>>,
     transposition_table: Box<[TTEntry]>,
+    table_length: usize,
 }
 
 impl Negamax {
     pub fn new() -> Self {
+        // convert from megabytes to bytes
+        let desired_size = engine_options().get_number("Hash") * 1024 * 1024;
+        let tt_entry_size = size_of::<TTEntry>();
+
+        // calculate how many entries will fit in that memory size
+        let table_length = desired_size / tt_entry_size;
+
         Self {
             node_count: 0,
             best_line: vec![None; 100],
-            transposition_table: vec![TTEntry::default(); TABLE_SIZE].into_boxed_slice(),
+            transposition_table: vec![TTEntry::default(); table_length].into_boxed_slice(),
+            table_length,
         }
     }
 
@@ -49,7 +59,7 @@ impl Negamax {
             return 0;
         }
 
-        let tt_index = get_ttindex(hash);
+        let tt_index = get_ttindex(hash, self.table_length);
         let tt_entry = &self.transposition_table[tt_index];
         let replace_tt = tt_entry.depth < depth || tt_entry.hash != hash;
 

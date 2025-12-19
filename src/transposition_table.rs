@@ -1,6 +1,5 @@
 use shakmaty::zobrist::Zobrist64;
 
-pub const TABLE_SIZE: usize = 1_usize << 22;
 pub type TTHash = Zobrist64;
 
 #[derive(Clone)]
@@ -29,6 +28,6 @@ impl Default for TTEntry {
     }
 }
 
-pub fn get_ttindex(hash: TTHash) -> usize {
-    (hash.0 as usize) & (TABLE_SIZE - 1)
+pub fn get_ttindex(hash: TTHash, length: usize) -> usize {
+    (hash.0 as usize) & (length - 1)
 }

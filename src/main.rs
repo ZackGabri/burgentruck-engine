@@ -1,14 +1,23 @@
 use std::io::{self, Write};
+use std::sync::OnceLock;
 
 use shakmaty::fen::Fen;
 use shakmaty::uci::UciMove;
 use shakmaty::{Chess, Position};
 
 use crate::history::MoveHistory;
+use crate::options::EngineOptions;
 
 mod history;
+mod options;
 mod search;
 mod transposition_table;
+
+pub fn engine_options() -> &'static EngineOptions {
+    static ENGINE_OPTIONS: OnceLock<EngineOptions> = OnceLock::new();
+
+    ENGINE_OPTIONS.get_or_init(EngineOptions::default)
+}
 
 fn main() -> Result<(), anyhow::Error> {
     let mut pos = Chess::default();
@@ -27,10 +36,25 @@ fn main() -> Result<(), anyhow::Error> {
             ["uci", ..] => {
                 println!("id name Bürgentruck");
                 println!("id author ZackGabri & TampliteSiphronKents");
+                println!();
+                EngineOptions::print_defaults();
+
                 println!("uciok");
             }
+            ["setoption", args @ ..] => {
+                if let ["name", args @ ..] = args {
+                    let mut split = args.split(|x| *x == "value");
+                    let name = split.next().unwrap_or(&[""]).join(" ");
+                    let value = split.next().unwrap_or(&[""]).join(" ");
+
+                    let result = engine_options().set(name, value);
+                    if let Err(err) = result {
+                        println!("{err:?}")
+                    }
+                };
+            }
+
             ["isready", ..] => println!("readyok"),
-            ["setoption", _args @ ..] => {}
             ["ucinewgame", ..] => {}
 
             ["position"] => {}

@@ -7,15 +7,13 @@ use std::time::Instant;
 mod eval;
 mod negamax;
 
-const DEFAULT_SEARCH_DEPTH: usize = 5;
-
 pub fn search(
     position: &Chess,
     history: Option<&MoveHistory>,
     max_depth: Option<usize>,
     max_nodes: Option<usize>,
 ) -> Option<Move> {
-    let max_depth = max_depth.unwrap_or(DEFAULT_SEARCH_DEPTH);
+    let max_depth = max_depth.unwrap_or(crate::engine_options().get_number("Default Depth"));
     let max_nodes = max_nodes.unwrap_or_default();
 
     let default_history = MoveHistory::default();
@@ -25,7 +23,7 @@ pub fn search(
     println!("info history size {:?}", history.index);
 
     let start = Instant::now();
-    for depth in 0..=max_depth {
+    for depth in 1..=max_depth {
         let best_score = negamax.negamax(position, history, depth, 0, -69420, 69420);
         let duration = start.elapsed();
 
