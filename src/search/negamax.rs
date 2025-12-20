@@ -9,7 +9,6 @@ use crate::transposition_table::{TTBound, TTEntry, get_ttindex};
 // struct for shared data between every negamax call
 pub struct Negamax {
     pub node_count: usize,
-    pub best_line: Vec<Option<Move>>,
     transposition_table: Box<[TTEntry]>,
     table_length: usize,
 }
@@ -25,16 +24,17 @@ impl Negamax {
 
         Self {
             node_count: 0,
-            best_line: vec![None; 100],
             transposition_table: vec![TTEntry::default(); table_length].into_boxed_slice(),
             table_length,
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn negamax(
         &mut self,
         position: &Chess,
         history: &MoveHistory,
+        pv_line: &mut [Option<Move>],
         depth: usize,
         ply: usize,
         mut alpha: i32,
@@ -93,13 +93,15 @@ impl Negamax {
             }
         }
 
-        self.sort_moves(&mut moves, ply);
+        self.sort_moves(&mut moves, &tt_entry.best_move);
 
         for mov in moves.into_iter() {
             let position = position.clone().play(mov).unwrap();
+            let mut child_pv = vec![None; depth];
             let score = -self.negamax(
                 &position,
                 &history.clone(),
+                &mut child_pv,
                 depth - 1,
                 ply + 1,
                 -beta,
@@ -110,7 +112,8 @@ impl Negamax {
             if score > max {
                 max = score;
 
-                self.best_line[ply] = Some(mov);
+                pv_line[0] = Some(mov);
+                pv_line[1..(child_pv.len() + 1)].copy_from_slice(&child_pv[..]);
 
                 if score > alpha {
                     alpha = score;
@@ -135,6 +138,7 @@ impl Negamax {
                 hash,
                 depth,
                 bound,
+                best_move: pv_line[0],
                 score: max,
             };
         }
@@ -175,11 +179,11 @@ impl Negamax {
         best_value
     }
 
-    fn sort_moves(&self, moves: &mut MoveList, ply: usize) {
+    fn sort_moves(&self, moves: &mut MoveList, hash_move: &Option<Move>) {
         self.sort_captures(moves);
 
-        if let Some(best) = self.best_line[ply]
-            && let Some(best_move_index) = moves.iter().position(|m| *m == best)
+        if let Some(best) = hash_move
+            && let Some(best_move_index) = moves.iter().position(|m| m == best)
         {
             moves.swap(0, best_move_index);
         }

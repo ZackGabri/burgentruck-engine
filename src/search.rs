@@ -19,12 +19,13 @@ pub fn search(
     let default_history = MoveHistory::default();
     let history = history.unwrap_or(&default_history);
 
-    let mut negamax = Negamax::new();
     println!("info history size {:?}", history.index);
 
+    let mut negamax = Negamax::new();
+    let mut pv_line = vec![None; max_depth + 1];
     let start = Instant::now();
     for depth in 1..=max_depth {
-        let best_score = negamax.negamax(position, history, depth, 0, -69420, 69420);
+        let best_score = negamax.negamax(position, history, &mut pv_line, depth, 0, -69420, 69420);
         let duration = start.elapsed();
 
         println!(
@@ -32,8 +33,7 @@ pub fn search(
             negamax.node_count,
             (negamax.node_count as f64 / duration.as_secs_f64()) as usize,
             duration.as_millis(),
-            negamax
-                .best_line
+            pv_line
                 .iter()
                 .filter_map(|x| x.map(|x| x.to_uci(position.castles().mode()).to_string()))
                 .collect::<Vec<String>>()
@@ -45,5 +45,5 @@ pub fn search(
         }
     }
 
-    dbg!(negamax.best_line[0])
+    dbg!(pv_line.first().unwrap().to_owned())
 }

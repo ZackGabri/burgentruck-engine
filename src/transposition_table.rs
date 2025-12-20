@@ -15,6 +15,7 @@ pub struct TTEntry {
     pub bound: TTBound,
     pub depth: usize,
     pub score: i32,
+    pub best_move: Option<shakmaty::Move>,
 }
 
 impl Default for TTEntry {
@@ -23,6 +24,7 @@ impl Default for TTEntry {
             hash: Default::default(),
             depth: Default::default(),
             bound: TTBound::Exact,
+            best_move: None,
             score: -69420,
         }
     }
