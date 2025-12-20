@@ -7,7 +7,6 @@ use shakmaty::{Chess, Position};
 
 use crate::history::MoveHistory;
 use crate::options::EngineOptions;
-use crate::transposition_table::TTEntry;
 
 mod history;
 mod options;
@@ -26,8 +25,6 @@ fn main() -> Result<(), anyhow::Error> {
     let stdin = io::stdin();
     let mut stdout = io::stdout();
     let mut history = MoveHistory::new();
-
-    println!("{}", size_of::<TTEntry>());
 
     loop {
         let mut line = String::new();
