@@ -105,21 +105,43 @@ fn main() -> Result<(), anyhow::Error> {
             },
 
             ["go", "nodes", val] => {
-                let best_move = search::search(&pos, Some(&history), None, val.parse().ok());
+                let best_move = search::search(&pos, Some(&history), None, val.parse().ok(), None);
 
                 if let Some(best_move) = best_move {
                     println!("bestmove {}", best_move.to_uci(pos.castles().mode()));
                 }
             }
             ["go", "depth", val] => {
-                let best_move = search::search(&pos, Some(&history), val.parse().ok(), None);
+                let best_move = search::search(&pos, Some(&history), val.parse().ok(), None, None);
 
                 if let Some(best_move) = best_move {
                     println!("bestmove {}", best_move.to_uci(pos.castles().mode()));
                 }
             }
-            ["go", ..] => {
-                let best_move = search::search(&pos, Some(&history), None, None);
+            ["go", "movetime", time] => {
+                let time = time.parse().ok();
+                let best_move = search::search(&pos, Some(&history), None, None, time);
+
+                if let Some(best_move) = best_move {
+                    println!("bestmove {}", best_move.to_uci(pos.castles().mode()));
+                }
+            }
+            ["go", args @ ..] => {
+                let time_args = args.chunks(2);
+                let mut time = search::negamax::TimeControl::default();
+
+                for arg in time_args {
+                    match arg {
+                        ["wtime", wtime] => time.w_time = wtime.parse().unwrap_or_default(),
+                        ["btime", btime] => time.b_time = btime.parse().unwrap_or_default(),
+                        ["winc", inc] => time.w_inc = inc.parse().unwrap_or_default(),
+                        ["binc", inc] => time.b_inc = inc.parse().unwrap_or_default(),
+                        _ => {}
+                    }
+                }
+
+                let time = search::allocate_time(&pos, &time);
+                let best_move = search::search(&pos, Some(&history), None, None, time);
 
                 if let Some(best_move) = best_move {
                     println!("bestmove {}", best_move.to_uci(pos.castles().mode()));

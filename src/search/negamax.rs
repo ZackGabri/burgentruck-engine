@@ -1,3 +1,5 @@
+use std::time::{Duration, Instant};
+
 use shakmaty::zobrist::ZobristHash;
 use shakmaty::{Chess, Move, MoveList, Position};
 
@@ -6,11 +8,22 @@ use crate::history::MoveHistory;
 use crate::search::eval::get_piece_value;
 use crate::transposition_table::{TTBound, TTEntry, get_ttindex};
 
+#[derive(Default, Debug)]
+pub struct TimeControl {
+    pub w_time: u64,
+    pub b_time: u64,
+    pub w_inc: u64,
+    pub b_inc: u64,
+}
+
 // struct for shared data between every negamax call
 pub struct Negamax {
     pub node_count: usize,
     transposition_table: Box<[TTEntry]>,
     table_length: usize,
+
+    pub start_time: Option<Instant>,      // start time in millis
+    pub allocated_time: Option<Duration>, // total allocated time to spend searching
 }
 
 impl Negamax {
@@ -26,6 +39,16 @@ impl Negamax {
             node_count: 0,
             transposition_table: vec![TTEntry::default(); table_length].into_boxed_slice(),
             table_length,
+
+            start_time: None,
+            allocated_time: None,
+        }
+    }
+
+    pub fn set_time(&mut self, duration: u64) {
+        if duration != 0 {
+            self.allocated_time = Some(Duration::from_millis(duration));
+            self.start_time = Some(Instant::now());
         }
     }
 
@@ -94,8 +117,17 @@ impl Negamax {
         }
 
         self.sort_moves(&mut moves, &tt_entry.best_move);
-
         for mov in moves.into_iter() {
+            if let Some(allocated_time) = self.allocated_time
+                && let Some(start_time) = self.start_time
+            {
+                let time_elapsed = Instant::now().duration_since(start_time);
+
+                if time_elapsed >= allocated_time {
+                    return alpha;
+                }
+            }
+
             let position = position.clone().play(mov).unwrap();
             let mut child_pv = vec![None; depth];
             let score = -self.negamax(

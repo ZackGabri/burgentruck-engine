@@ -1,29 +1,37 @@
-use crate::history::MoveHistory;
+use crate::{history::MoveHistory, search::negamax::TimeControl};
 use negamax::Negamax;
 
-use shakmaty::{Chess, Move, Position};
+use shakmaty::{Chess, Color, Move, Position};
 use std::time::Instant;
 
-mod eval;
-mod negamax;
+pub mod eval;
+pub mod negamax;
 
 pub fn search(
     position: &Chess,
     history: Option<&MoveHistory>,
     max_depth: Option<usize>,
     max_nodes: Option<usize>,
+    time: Option<u64>,
 ) -> Option<Move> {
-    let max_depth = max_depth.unwrap_or(crate::engine_options().get_number("Default Depth"));
+    let max_depth = if max_nodes.is_some() || time.is_some() {
+        100 // just a really high depth so we hit the other limits before it
+    } else {
+        max_depth.unwrap_or(crate::engine_options().get_number("Default Depth"))
+    };
     let max_nodes = max_nodes.unwrap_or_default();
-
     let default_history = MoveHistory::default();
     let history = history.unwrap_or(&default_history);
 
-    println!("info history size {:?}", history.index);
-
     let mut negamax = Negamax::new();
-    let mut pv_line = vec![None; max_depth + 1];
+
     let start = Instant::now();
+    let mut pv_line = vec![None; max_depth + 1];
+
+    if let Some(time) = time {
+        negamax.set_time(time);
+    }
+
     for depth in 1..=max_depth {
         let best_score = negamax.negamax(position, history, &mut pv_line, depth, 0, -69420, 69420);
         let duration = start.elapsed();
@@ -40,10 +48,27 @@ pub fn search(
                 .join(" ")
         );
 
+        if let Some(allocated_time) = negamax.allocated_time
+            && let Some(start_time) = negamax.start_time
+        {
+            let time_elapsed = Instant::now().duration_since(start_time);
+
+            if time_elapsed >= allocated_time {
+                break;
+            }
+        }
         if max_nodes > 0 && negamax.node_count >= max_nodes {
             break;
         }
     }
 
-    dbg!(pv_line.first().unwrap().to_owned())
+    pv_line[0]
+}
+
+pub fn allocate_time(position: &Chess, time: &TimeControl) -> Option<u64> {
+    match position.turn() {
+        Color::Black if time.b_time > 0 => Some((time.b_time / 30) + (time.b_inc / 2)),
+        Color::White if time.w_time > 0 => Some((time.w_time / 30) + (time.w_inc / 2)),
+        _ => None,
+    }
 }
