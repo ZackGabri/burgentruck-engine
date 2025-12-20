@@ -26,14 +26,13 @@ pub fn search(
     let mut negamax = Negamax::new();
 
     let start = Instant::now();
-    let mut pv_line = vec![None; max_depth + 1];
 
     if let Some(time) = time {
         negamax.set_time(time);
     }
 
     for depth in 1..=max_depth {
-        let best_score = negamax.negamax(position, history, &mut pv_line, depth, 0, -69420, 69420);
+        let best_score = negamax.negamax(position, history, depth, 0, -69420, 69420);
         let duration = start.elapsed();
 
         println!(
@@ -41,34 +40,31 @@ pub fn search(
             negamax.node_count,
             (negamax.node_count as f64 / duration.as_secs_f64()) as usize,
             duration.as_millis(),
-            pv_line
+            negamax
+                .pv_line
                 .iter()
                 .filter_map(|x| x.map(|x| x.to_uci(position.castles().mode()).to_string()))
                 .collect::<Vec<String>>()
                 .join(" ")
         );
 
-        if let Some(allocated_time) = negamax.allocated_time
-            && let Some(start_time) = negamax.start_time
-        {
-            let time_elapsed = Instant::now().duration_since(start_time);
-
-            if time_elapsed >= allocated_time {
-                break;
-            }
+        if negamax.is_out_of_time() {
+            break;
         }
         if max_nodes > 0 && negamax.node_count >= max_nodes {
             break;
         }
     }
 
-    pv_line[0]
+    negamax.pv_line[0]
 }
 
-pub fn allocate_time(position: &Chess, time: &TimeControl) -> Option<u64> {
+pub fn allocate_time(position: &Chess, time: &TimeControl, played_moves: u64) -> Option<u64> {
+    let dividor = 30.max(60 - played_moves);
+
     match position.turn() {
-        Color::Black if time.b_time > 0 => Some((time.b_time / 30) + (time.b_inc / 2)),
-        Color::White if time.w_time > 0 => Some((time.w_time / 30) + (time.w_inc / 2)),
+        Color::Black if time.b_time > 0 => Some((time.b_time / dividor) + (time.b_inc / 2)),
+        Color::White if time.w_time > 0 => Some((time.w_time / dividor) + (time.w_inc / 2)),
         _ => None,
     }
 }

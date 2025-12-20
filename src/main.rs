@@ -140,7 +140,7 @@ fn main() -> Result<(), anyhow::Error> {
                     }
                 }
 
-                let time = search::allocate_time(&pos, &time);
+                let time = search::allocate_time(&pos, &time, (history.index + 1) as u64);
                 let best_move = search::search(&pos, Some(&history), None, None, time);
 
                 if let Some(best_move) = best_move {

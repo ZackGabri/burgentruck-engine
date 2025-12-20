@@ -19,11 +19,11 @@ pub struct TimeControl {
 // struct for shared data between every negamax call
 pub struct Negamax {
     pub node_count: usize,
-    transposition_table: Box<[TTEntry]>,
+    pub pv_line: Vec<Option<Move>>,
+    transposition_table: Box<[TTEntry]>, // o
     table_length: usize,
 
-    pub start_time: Option<Instant>,      // start time in millis
-    pub allocated_time: Option<Duration>, // total allocated time to spend searching
+    deadline: Option<Instant>, // deadline for the search to stop at
 }
 
 impl Negamax {
@@ -39,16 +39,15 @@ impl Negamax {
             node_count: 0,
             transposition_table: vec![TTEntry::default(); table_length].into_boxed_slice(),
             table_length,
+            pv_line: vec![None; 100],
 
-            start_time: None,
-            allocated_time: None,
+            deadline: None,
         }
     }
 
     pub fn set_time(&mut self, duration: u64) {
         if duration != 0 {
-            self.allocated_time = Some(Duration::from_millis(duration));
-            self.start_time = Some(Instant::now());
+            self.deadline = Some(Instant::now() + Duration::from_millis(duration));
         }
     }
 
@@ -57,7 +56,6 @@ impl Negamax {
         &mut self,
         position: &Chess,
         history: &MoveHistory,
-        pv_line: &mut [Option<Move>],
         depth: usize,
         ply: usize,
         mut alpha: i32,
@@ -65,6 +63,10 @@ impl Negamax {
     ) -> i32 {
         if depth == 0 {
             return self.quiescence(position, &mut alpha, beta);
+        }
+
+        if self.is_out_of_time() {
+            return -alpha;
         }
 
         if position.is_insufficient_material() {
@@ -117,23 +119,12 @@ impl Negamax {
         }
 
         self.sort_moves(&mut moves, &tt_entry.best_move);
+        let mut best_move = None;
         for mov in moves.into_iter() {
-            if let Some(allocated_time) = self.allocated_time
-                && let Some(start_time) = self.start_time
-            {
-                let time_elapsed = Instant::now().duration_since(start_time);
-
-                if time_elapsed >= allocated_time {
-                    return alpha;
-                }
-            }
-
             let position = position.clone().play(mov).unwrap();
-            let mut child_pv = vec![None; depth];
             let score = -self.negamax(
                 &position,
                 &history.clone(),
-                &mut child_pv,
                 depth - 1,
                 ply + 1,
                 -beta,
@@ -143,9 +134,11 @@ impl Negamax {
 
             if score > max {
                 max = score;
+                best_move = Some(mov);
 
-                pv_line[0] = Some(mov);
-                pv_line[1..(child_pv.len() + 1)].copy_from_slice(&child_pv[..]);
+                if ply == 0 {
+                    self.pv_line[0] = Some(mov);
+                }
 
                 if score > alpha {
                     alpha = score;
@@ -170,7 +163,7 @@ impl Negamax {
                 hash,
                 depth,
                 bound,
-                best_move: pv_line[0],
+                best_move,
                 score: max,
             };
         }
@@ -178,8 +171,22 @@ impl Negamax {
         max
     }
 
+    pub fn is_out_of_time(&self) -> bool {
+        if let Some(deadline) = self.deadline
+            && Instant::now() > deadline
+        {
+            return true;
+        }
+
+        false
+    }
+
     fn quiescence(&mut self, position: &Chess, alpha: &mut i32, beta: i32) -> i32 {
         let static_eval = super::eval::evaluate(position);
+
+        if self.is_out_of_time() {
+            return static_eval;
+        }
 
         let mut best_value = static_eval;
         if best_value >= beta {
