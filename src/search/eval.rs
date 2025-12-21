@@ -1,45 +1,170 @@
-use shakmaty::{ByColor, ByRole, Chess, Color, Position, Role};
+use shakmaty::{ByColor, ByRole, Chess, Color, Position};
 
 pub const PAWN_VALUE: i32 = 100;
-pub const BISHOP_VALUE: i32 = 300;
-pub const KNIGHT_VALUE: i32 = 300;
+pub const BISHOP_VALUE: i32 = 320;
+pub const KNIGHT_VALUE: i32 = 330;
 pub const ROOK_VALUE: i32 = 500;
 pub const QUEEN_VALUE: i32 = 900;
-pub const KING_VALUE: i32 = 10000;
+pub const KING_VALUE: i32 = 20000;
+
+#[rustfmt::skip]
+const PAWN_TABLE: [i32; 64] = [
+    0,  0,  0,  0,  0,  0,  0,  0,
+   50, 50, 50, 50, 50, 50, 50, 50,
+   10, 10, 20, 30, 30, 20, 10, 10,
+    5,  5, 10, 25, 25, 10,  5,  5,
+    0,  0,  0, 20, 20,  0,  0,  0,
+    5, -5,-10,  0,  0,-10, -5,  5,
+    5, 10, 10,-20,-20, 10, 10,  5,
+    0,  0,  0,  0,  0,  0,  0,  0
+];
+
+#[rustfmt::skip]
+const KNIGHT_TABLE: [i32; 64] = [
+    -50,-40,-30,-30,-30,-30,-40,-50,
+    -40,-20,  0,  0,  0,  0,-20,-40,
+    -30,  0, 10, 15, 15, 10,  0,-30,
+    -30,  5, 15, 20, 20, 15,  5,-30,
+    -30,  0, 15, 20, 20, 15,  0,-30,
+    -30,  5, 10, 15, 15, 10,  5,-30,
+    -40,-20,  0,  5,  5,  0,-20,-40,
+    -50,-40,-30,-30,-30,-30,-40,-50,
+];
+
+#[rustfmt::skip]
+const BISHOP_TABLE: [i32; 64] = [
+    -20,-10,-10,-10,-10,-10,-10,-20,
+    -10,  0,  0,  0,  0,  0,  0,-10,
+    -10,  0,  5, 10, 10,  5,  0,-10,
+    -10,  5,  5, 10, 10,  5,  5,-10,
+    -10,  0, 10, 10, 10, 10,  0,-10,
+    -10, 10, 10, 10, 10, 10, 10,-10,
+    -10,  5,  0,  0,  0,  0,  5,-10,
+    -20,-10,-10,-10,-10,-10,-10,-20,
+];
+
+#[rustfmt::skip]
+const ROOK_TABLE: [i32; 64] = [
+    0,  0,  0,  0,  0,  0,  0,  0,
+    5, 10, 10, 10, 10, 10, 10,  5,
+   -5,  0,  0,  0,  0,  0,  0, -5,
+   -5,  0,  0,  0,  0,  0,  0, -5,
+   -5,  0,  0,  0,  0,  0,  0, -5,
+   -5,  0,  0,  0,  0,  0,  0, -5,
+   -5,  0,  0,  0,  0,  0,  0, -5,
+    0,  0,  0,  5,  5,  0,  0,  0
+];
+
+#[rustfmt::skip]
+const QUEEN_TABLE: [i32; 64] = [
+    -20,-10,-10, -5, -5,-10,-10,-20,
+    -10,  0,  0,  0,  0,  0,  0,-10,
+    -10,  0,  5,  5,  5,  5,  0,-10,
+     -5,  0,  5,  5,  5,  5,  0, -5,
+      0,  0,  5,  5,  5,  5,  0, -5,
+    -10,  5,  5,  5,  5,  5,  0,-10,
+    -10,  0,  5,  0,  0,  0,  0,-10,
+    -20,-10,-10, -5, -5,-10,-10,-20
+];
+
+#[rustfmt::skip]
+const KING_TABLE_MIDDLEGAME: [i32; 64] = [
+    -30,-40,-40,-50,-50,-40,-40,-30,
+    -30,-40,-40,-50,-50,-40,-40,-30,
+    -30,-40,-40,-50,-50,-40,-40,-30,
+    -30,-40,-40,-50,-50,-40,-40,-30,
+    -20,-30,-30,-40,-40,-30,-30,-20,
+    -10,-20,-20,-20,-20,-20,-20,-10,
+     20, 20,  0,  0,  0,  0, 20, 20,
+     20, 30, 10,  0,  0, 10, 30, 20
+];
+
+#[rustfmt::skip]
+const KING_TABLE_ENDGAME: [i32; 64] = [
+    -50,-40,-30,-20,-20,-30,-40,-50,
+    -30,-20,-10,  0,  0,-10,-20,-30,
+    -30,-10, 20, 30, 30, 20,-10,-30,
+    -30,-10, 30, 40, 40, 30,-10,-30,
+    -30,-10, 30, 40, 40, 30,-10,-30,
+    -30,-10, 20, 30, 30, 20,-10,-30,
+    -30,-30,  0,  0,  0,  0,-30,-30,
+    -50,-30,-30,-30,-30,-30,-30,-50
+];
+
+const PIECE_TABLES: [[i32; 64]; 7] = [
+    PAWN_TABLE,
+    KNIGHT_TABLE,
+    BISHOP_TABLE,
+    ROOK_TABLE,
+    QUEEN_TABLE,
+    KING_TABLE_ENDGAME,
+    KING_TABLE_MIDDLEGAME,
+];
+
+const PIECE_VALUES: [i32; 6] = [
+    PAWN_VALUE,
+    BISHOP_VALUE,
+    KNIGHT_VALUE,
+    ROOK_VALUE,
+    QUEEN_VALUE,
+    KING_VALUE,
+];
+
+pub const MMV_LVA: [[i32; 6]; 6] = {
+    let mut table = [[0; 6]; 6];
+
+    let mut i = 0;
+    while i < 6 {
+        let mut j = 0;
+        while j < 6 {
+            let victim = PIECE_VALUES[i];
+            let attacker = PIECE_VALUES[j];
+
+            let score = victim * 10 - attacker;
+
+            table[i][j] = score;
+
+            j += 1;
+        }
+
+        i += 1;
+    }
+
+    table
+};
 
 pub fn evaluate(position: &Chess) -> i32 {
-    let ByColor { white, black } = position.board().material();
+    let board = position.board();
+
+    let mut white_score = 0;
+    let mut black_score = 0;
+
+    for (square, piece) in board {
+        let piece_value = PIECE_VALUES[piece.role as usize - 1];
+
+        match piece.color {
+            Color::White => {
+                // we flip for white because A1 = index 0, where as index 0 represents A8 in our piece tables
+                let bonus = PIECE_TABLES[piece.role as usize - 1][square.flip_vertical() as usize];
+                white_score += piece_value + bonus
+            }
+            Color::Black => {
+                let bonus = PIECE_TABLES[piece.role as usize - 1][square as usize];
+                black_score += piece_value + bonus
+            }
+        }
+    }
+
+    // let ByColor { white, black } = position.board();
+
     let who2move = who2move_score(position.turn());
 
-    ((count_material(white) - count_material(black)) * who2move) + rand::random_range(-10..=10)
+    ((white_score - black_score) * who2move) + rand::random_range(-10..=10)
 }
 
 fn who2move_score(color: shakmaty::Color) -> i32 {
     match color {
         Color::White => 1,
         Color::Black => -1,
-    }
-}
-
-fn count_material(pieces: ByRole<u8>) -> i32 {
-    let mut count: i32 = 0;
-
-    count += pieces.pawn as i32 * PAWN_VALUE;
-    count += pieces.bishop as i32 * BISHOP_VALUE;
-    count += pieces.knight as i32 * KNIGHT_VALUE;
-    count += pieces.rook as i32 * ROOK_VALUE;
-    count += pieces.queen as i32 * QUEEN_VALUE;
-
-    count
-}
-
-pub fn get_piece_value(piece: Role) -> i32 {
-    match piece {
-        Role::Pawn => PAWN_VALUE,
-        Role::Bishop => BISHOP_VALUE,
-        Role::Knight => KNIGHT_VALUE,
-        Role::Rook => ROOK_VALUE,
-        Role::Queen => QUEEN_VALUE,
-        Role::King => KING_VALUE,
     }
 }

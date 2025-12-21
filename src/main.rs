@@ -34,7 +34,7 @@ fn main() -> Result<(), anyhow::Error> {
 
         match tokens.as_slice() {
             ["uci", ..] => {
-                println!("id name Bürgentruck");
+                println!("id name Bürgentruck {}", env!("CARGO_PKG_VERSION"));
                 println!("id author ZackGabri & TampliteSiphronKents");
                 println!();
                 EngineOptions::print_defaults();

@@ -5,7 +5,6 @@ use shakmaty::{Chess, Move, MoveList, Position};
 
 use crate::engine_options;
 use crate::history::MoveHistory;
-use crate::search::eval::get_piece_value;
 use crate::transposition_table::{TTBound, TTEntry, get_ttindex};
 
 #[derive(Default, Debug)]
@@ -231,9 +230,7 @@ impl Negamax {
     fn sort_captures(&self, moves: &mut MoveList) {
         moves.sort_by_key(|m| {
             if let Some(victim) = m.capture() {
-                let attacker = get_piece_value(m.role());
-                let victim = get_piece_value(victim);
-                -(victim * 10 - attacker)
+                -super::eval::MMV_LVA[victim as usize - 1][m.role() as usize - 1]
             } else {
                 100000 // aka show all normal moves last
             }
