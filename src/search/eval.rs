@@ -1,4 +1,4 @@
-use shakmaty::{ByColor, ByRole, Chess, Color, Position};
+use shakmaty::{Chess, Color, Position, Role, Square};
 
 pub const PAWN_VALUE: i32 = 100;
 pub const BISHOP_VALUE: i32 = 320;
@@ -139,27 +139,64 @@ pub fn evaluate(position: &Chess) -> i32 {
     let mut white_score = 0;
     let mut black_score = 0;
 
+    let mut game_phase = 0;
+
+    let mut white_king_square = None;
+    let mut black_king_square = None;
+
     for (square, piece) in board {
         let piece_value = PIECE_VALUES[piece.role as usize - 1];
 
+        game_phase += match piece.role {
+            Role::Bishop | Role::Knight => 3,
+            Role::Rook => 5,
+            Role::Queen => 10,
+            _ => 0,
+        };
+
         match piece.color {
             Color::White => {
+                // we handle the king later
+                if piece.role == Role::King {
+                    white_king_square = Some(square);
+                    continue;
+                }
+
                 // we flip for white because A1 = index 0, where as index 0 represents A8 in our piece tables
                 let bonus = PIECE_TABLES[piece.role as usize - 1][square.flip_vertical() as usize];
                 white_score += piece_value + bonus
             }
             Color::Black => {
+                if piece.role == Role::King {
+                    black_king_square = Some(square);
+                    continue;
+                }
+
                 let bonus = PIECE_TABLES[piece.role as usize - 1][square as usize];
                 black_score += piece_value + bonus
             }
         }
     }
 
-    // let ByColor { white, black } = position.board();
+    white_score += king_value(Color::White, white_king_square, game_phase);
+    black_score += king_value(Color::Black, black_king_square, game_phase);
 
     let who2move = who2move_score(position.turn());
 
     ((white_score - black_score) * who2move) + rand::random_range(-10..=10)
+}
+
+fn king_value(color: Color, square: Option<Square>, game_phase: i32) -> i32 {
+    let square = match color {
+        Color::Black => square.unwrap() as usize,
+        Color::White => square.unwrap().flip_vertical() as usize,
+    };
+
+    let square_bonus = (KING_TABLE_MIDDLEGAME[square] * game_phase
+        + KING_TABLE_ENDGAME[square] * (64 - game_phase))
+        / 64;
+
+    KING_VALUE + square_bonus
 }
 
 fn who2move_score(color: shakmaty::Color) -> i32 {
