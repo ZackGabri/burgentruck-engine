@@ -72,6 +72,19 @@ impl Negamax {
             return 0;
         }
 
+        let is_check = position.is_check();
+        let is_root = ply == 0;
+
+        if !is_check && !is_root {
+            // reverse futility pruning
+            let static_eval = super::eval::evaluate(position);
+            let margin = 150 * depth;
+
+            if depth <= 4 && static_eval >= beta + margin as i32 {
+                return static_eval;
+            }
+        }
+
         let original_alpha = alpha;
         let hash = position.zobrist_hash(shakmaty::EnPassantMode::Legal);
 
@@ -106,9 +119,10 @@ impl Negamax {
 
         let mut max = -69420;
         let mut moves = position.legal_moves();
+        self.sort_moves(&mut moves, &tt_entry.best_move);
 
         if moves.is_empty() {
-            if position.is_check() {
+            if is_check {
                 // checkmate
                 return -69420 + ply as i32;
             } else {
@@ -117,7 +131,22 @@ impl Negamax {
             }
         }
 
-        self.sort_moves(&mut moves, &tt_entry.best_move);
+        // if !is_check && !is_root {
+        //     //  int static_eval = evaluate_pos(pos);
+        //     //  int RFP_margin = beta + 80 * depth;
+        //     //  if (depth <= 4 && static_eval >= RFP_margin) {
+        //     //     return static_eval;
+        //     //  }
+        //     // reverse futility pruning
+        //     if tt_entry.best_move.is_some() {
+        //         let static_eval = super::eval::evaluate(position);
+        //         let margin = 150 * depth as i32;
+        //         if depth <= 4 && static_eval >= beta + margin {
+        //             return static_eval;
+        //         }
+        //     }
+        // }
+
         let mut best_move = None;
         for mov in moves.into_iter() {
             let position = position.clone().play(mov).unwrap();
@@ -135,7 +164,7 @@ impl Negamax {
                 max = score;
                 best_move = Some(mov);
 
-                if ply == 0 {
+                if is_root {
                     self.pv_line[0] = Some(mov);
                 }
 
@@ -218,6 +247,10 @@ impl Negamax {
     }
 
     fn sort_moves(&self, moves: &mut MoveList, hash_move: &Option<Move>) {
+        if moves.is_empty() {
+            return;
+        }
+
         self.sort_captures(moves);
 
         if let Some(best) = hash_move
