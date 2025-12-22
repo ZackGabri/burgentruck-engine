@@ -1,8 +1,8 @@
 use shakmaty::{Chess, Color, Position, Role, Square};
 
 pub const PAWN_VALUE: i32 = 100;
-pub const BISHOP_VALUE: i32 = 320;
-pub const KNIGHT_VALUE: i32 = 330;
+pub const KNIGHT_VALUE: i32 = 320;
+pub const BISHOP_VALUE: i32 = 330;
 pub const ROOK_VALUE: i32 = 500;
 pub const QUEEN_VALUE: i32 = 900;
 pub const KING_VALUE: i32 = 20000;
@@ -103,8 +103,8 @@ const PIECE_TABLES: [[i32; 64]; 7] = [
 
 const PIECE_VALUES: [i32; 6] = [
     PAWN_VALUE,
-    BISHOP_VALUE,
     KNIGHT_VALUE,
+    BISHOP_VALUE,
     ROOK_VALUE,
     QUEEN_VALUE,
     KING_VALUE,
