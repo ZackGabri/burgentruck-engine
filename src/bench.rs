@@ -72,7 +72,9 @@ pub fn bench() -> anyhow::Result<()> {
         let pos: Chess = fen.into_position(shakmaty::CastlingMode::Standard)?;
 
         let mut negamax = Negamax::new();
-        let _ = negamax.negamax(&pos, &MoveHistory::new(), BENCH_DEPTH, 0, -69420, 69420);
+        for depth in 1..=BENCH_DEPTH {
+            negamax.negamax(&pos, &MoveHistory::new(), depth, 0, -69420, 69420);
+        }
 
         let duration = start_time.elapsed();
         node_count += negamax.node_count;
