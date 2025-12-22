@@ -7,6 +7,7 @@ use shakmaty::{Chess, Move, MoveList, Position};
 
 use crate::engine_options;
 use crate::history::MoveHistory;
+use crate::search::eval::MATE_SCORE;
 use crate::transposition_table::{TTBound, TTEntry, get_ttindex};
 
 #[derive(Default, Debug)]
@@ -143,14 +144,14 @@ impl Negamax {
             }
         }
 
-        let mut max = -69420;
+        let mut max = -MATE_SCORE;
         let mut moves = position.legal_moves();
         self.sort_moves(&mut moves, &tt_entry.best_move);
 
         if moves.is_empty() {
             if is_check {
                 // checkmate
-                return -69420 + ply as i32;
+                return -MATE_SCORE + ply as i32;
             } else {
                 // stalemate
                 return 0;

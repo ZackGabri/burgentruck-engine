@@ -5,6 +5,7 @@ use shakmaty::fen::Fen;
 
 use crate::history::MoveHistory;
 use crate::search::negamax::Negamax;
+use crate::search::{DEFAULT_ALPHA, DEFAULT_BETA};
 
 const BENCH_POSITIONS: [&str; 50] = [
     "r3k2r/2pb1ppp/2pp1q2/p7/1nP1B3/1P2P3/P2N1PPP/R2QK2R w KQkq a6 0 14",
@@ -73,7 +74,14 @@ pub fn bench() -> anyhow::Result<()> {
 
         let mut negamax = Negamax::new();
         for depth in 1..=BENCH_DEPTH {
-            negamax.negamax(&pos, &MoveHistory::new(), depth, 0, -69420, 69420);
+            negamax.negamax(
+                &pos,
+                &MoveHistory::new(),
+                depth,
+                0,
+                DEFAULT_ALPHA,
+                DEFAULT_BETA,
+            );
         }
 
         let duration = start_time.elapsed();

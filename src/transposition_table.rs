@@ -1,5 +1,7 @@
 use shakmaty::zobrist::Zobrist64;
 
+use crate::search::eval::MATE_SCORE;
+
 pub type TTHash = Zobrist64;
 
 #[derive(Clone, Copy)]
@@ -25,7 +27,7 @@ impl Default for TTEntry {
             depth: Default::default(),
             bound: TTBound::Exact,
             best_move: None,
-            score: -69420,
+            score: -MATE_SCORE,
         }
     }
 }

@@ -1,11 +1,16 @@
-use crate::{history::MoveHistory, search::negamax::TimeControl};
-use negamax::Negamax;
+use crate::history::MoveHistory;
+use crate::search::eval::MATE_SCORE;
+
+use negamax::{Negamax, TimeControl};
 
 use shakmaty::{Chess, Color, Move, Position};
 use std::time::Instant;
 
 pub mod eval;
 pub mod negamax;
+
+pub const DEFAULT_ALPHA: i32 = -MATE_SCORE;
+pub const DEFAULT_BETA: i32 = MATE_SCORE;
 
 pub fn search(
     position: &Chess,
@@ -32,7 +37,7 @@ pub fn search(
     }
 
     for depth in 1..=max_depth {
-        let best_score = negamax.negamax(position, history, depth, 0, -69420, 69420);
+        let best_score = negamax.negamax(position, history, depth, 0, DEFAULT_ALPHA, DEFAULT_BETA);
         let duration = start.elapsed();
 
         println!(
