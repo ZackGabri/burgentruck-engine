@@ -11,6 +11,7 @@ pub fn default_options_list() -> &'static Vec<EngineOption<'static>> {
             EngineOption::new("Hash", OptionType::Spin(1..=2048, 128)),
             // The default depth the engine will search to
             EngineOption::new("Default Depth", OptionType::Spin(1..=64, 7)),
+            EngineOption::new("Threads", OptionType::Spin(1..=1, 1)),
         ]
     })
 }

@@ -2,14 +2,14 @@ use shakmaty::zobrist::Zobrist64;
 
 pub type TTHash = Zobrist64;
 
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 pub enum TTBound {
     Exact,
     Upper,
     Lower,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 pub struct TTEntry {
     pub hash: TTHash,
     pub bound: TTBound,

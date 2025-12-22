@@ -83,6 +83,26 @@ impl Negamax {
         let is_check = position.is_check();
         let is_root = ply == 0;
 
+        let tt_index = get_ttindex(hash, self.table_length);
+        let tt_entry = self.transposition_table[tt_index];
+        let replace_tt = tt_entry.depth < depth || tt_entry.hash != hash;
+
+        if tt_entry.depth >= depth && tt_entry.hash == hash {
+            match tt_entry.bound {
+                TTBound::Exact => return tt_entry.score,
+                TTBound::Lower => {
+                    if tt_entry.score >= beta {
+                        return tt_entry.score;
+                    }
+                }
+                TTBound::Upper => {
+                    if tt_entry.score < alpha {
+                        return tt_entry.score;
+                    }
+                }
+            }
+        }
+
         // whole node pruning
         if !is_check && !is_root {
             // reverse futility pruning
@@ -101,9 +121,10 @@ impl Negamax {
                 if non_pawns > 2 {
                     let null_position = position.clone().swap_turn().unwrap();
                     let reduction = 3 + depth / 3;
-                    let null_score = -self.negamax( // search with zero window
+                    let null_score = -self.negamax(
+                        // search with zero window
                         &null_position,
-                        &history.clone(),
+                        &history,
                         depth.saturating_sub(reduction),
                         ply + 1,
                         -beta,
@@ -113,26 +134,6 @@ impl Negamax {
                     // Make sure it's not a mate score
                     if null_score >= beta && null_score.abs() < 69000 {
                         return null_score;
-                    }
-                }
-            }
-        }
-
-        let tt_index = get_ttindex(hash, self.table_length);
-        let tt_entry = &self.transposition_table[tt_index];
-        let replace_tt = tt_entry.depth < depth || tt_entry.hash != hash;
-
-        if tt_entry.depth >= depth && tt_entry.hash == hash {
-            match tt_entry.bound {
-                TTBound::Exact => return tt_entry.score,
-                TTBound::Lower => {
-                    if tt_entry.score >= beta {
-                        return tt_entry.score;
-                    }
-                }
-                TTBound::Upper => {
-                    if tt_entry.score < alpha {
-                        return tt_entry.score;
                     }
                 }
             }
