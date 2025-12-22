@@ -83,6 +83,7 @@ impl Negamax {
         let is_check = position.is_check();
         let is_root = ply == 0;
 
+        // whole node pruning
         if !is_check && !is_root {
             // reverse futility pruning
             let static_eval = super::eval::evaluate(position);
@@ -90,6 +91,30 @@ impl Negamax {
 
             if depth <= 4 && static_eval >= beta + margin as i32 {
                 return static_eval;
+            }
+
+            // null move pruning
+            if depth >= 3 {
+                // Make sure it's not king and pawn endgame
+                let board = position.board();
+                let non_pawns = (board.occupied() & (!board.pawns())).count();
+                if non_pawns > 2 {
+                    let null_position = position.clone().swap_turn().unwrap();
+                    let reduction = 3 + depth / 3;
+                    let null_score = -self.negamax( // search with zero window
+                        &null_position,
+                        &history.clone(),
+                        depth.saturating_sub(reduction),
+                        ply + 1,
+                        -beta,
+                        -beta + 1,
+                    );
+
+                    // Make sure it's not a mate score
+                    if null_score >= beta && null_score.abs() < 69000 {
+                        return null_score;
+                    }
+                }
             }
         }
 
