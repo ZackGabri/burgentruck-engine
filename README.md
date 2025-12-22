@@ -10,6 +10,8 @@ Burgentruck uses [shakmaty crate](https://crates.io/crates/Shakmaty) for board r
 - Negamax with Alpha-beta Pruning (fail-soft)
 - Quiescence search (fail-soft)
 - Transposition table
+- Reverse futility pruning (RFP)
+- Null move pruning (NMP)
 - Move ordering: Hash move, MVV-LVA, quiet moves
 
 ### Evaluation
