@@ -66,7 +66,6 @@ fn main() -> Result<(), anyhow::Error> {
                     if args.first().copied() == Some("moves") {
                         let moves = args.get(1..).unwrap_or_default();
 
-                        dbg!(moves);
                         for m in moves {
                             let uci: UciMove = m.trim().parse()?;
                             let m = uci.to_move(&pos).unwrap();

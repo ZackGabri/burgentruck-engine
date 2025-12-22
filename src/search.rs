@@ -60,11 +60,11 @@ pub fn search(
 }
 
 pub fn allocate_time(position: &Chess, time: &TimeControl, played_moves: u64) -> Option<u64> {
-    let dividor = 30.max(60 - played_moves);
+    let divisor = 30.max(60_u64.saturating_sub(played_moves));
 
     match position.turn() {
-        Color::Black if time.b_time > 0 => Some((time.b_time / dividor) + (time.b_inc / 2)),
-        Color::White if time.w_time > 0 => Some((time.w_time / dividor) + (time.w_inc / 2)),
+        Color::Black if time.b_time > 0 => Some((time.b_time / divisor) + (time.b_inc / 2)),
+        Color::White if time.w_time > 0 => Some((time.w_time / divisor) + (time.w_inc / 2)),
         _ => None,
     }
 }
