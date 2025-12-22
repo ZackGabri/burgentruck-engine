@@ -1,3 +1,4 @@
+use rand::{Rng, rngs::SmallRng};
 use shakmaty::{Chess, Color, Position, Role, Square};
 
 pub const PAWN_VALUE: i32 = 100;
@@ -133,7 +134,7 @@ pub const MMV_LVA: [[i32; 6]; 6] = {
     table
 };
 
-pub fn evaluate(position: &Chess) -> i32 {
+pub fn evaluate(position: &Chess, rng: &mut SmallRng) -> i32 {
     let board = position.board();
 
     let mut white_score = 0;
@@ -183,7 +184,7 @@ pub fn evaluate(position: &Chess) -> i32 {
 
     let who2move = who2move_score(position.turn());
 
-    ((white_score - black_score) * who2move) + rand::random_range(-10..=10)
+    ((white_score - black_score) * who2move) + rng.random_range(-10..=10)
 }
 
 fn king_value(color: Color, square: Option<Square>, game_phase: i32) -> i32 {

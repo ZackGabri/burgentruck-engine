@@ -1,5 +1,7 @@
 use std::time::{Duration, Instant};
 
+use rand::SeedableRng;
+use rand::rngs::SmallRng;
 use shakmaty::zobrist::ZobristHash;
 use shakmaty::{Chess, Move, MoveList, Position};
 
@@ -21,6 +23,7 @@ pub struct Negamax {
     pub pv_line: Vec<Option<Move>>,
     transposition_table: Box<[TTEntry]>, // o
     table_length: usize,
+    rng: SmallRng,
 
     deadline: Option<Instant>, // deadline for the search to stop at
 }
@@ -39,6 +42,7 @@ impl Negamax {
             transposition_table: vec![TTEntry::default(); table_length].into_boxed_slice(),
             table_length,
             pv_line: vec![None; 100],
+            rng: SmallRng::from_seed([0; 32]),
 
             deadline: None,
         }
@@ -106,7 +110,7 @@ impl Negamax {
         // whole node pruning
         if !is_check && !is_root {
             // reverse futility pruning
-            let static_eval = super::eval::evaluate(position);
+            let static_eval = self.static_eval(position);
             let margin = 80 * depth;
 
             if depth <= 4 && static_eval >= beta + margin as i32 {
@@ -205,6 +209,11 @@ impl Negamax {
         max
     }
 
+    #[inline(always)]
+    fn static_eval(&mut self, position: &Chess) -> i32 {
+        super::eval::evaluate(position, &mut self.rng)
+    }
+
     pub fn is_out_of_time(&self) -> bool {
         if let Some(deadline) = self.deadline
             && Instant::now() > deadline
@@ -216,7 +225,7 @@ impl Negamax {
     }
 
     fn quiescence(&mut self, position: &Chess, alpha: &mut i32, beta: i32) -> i32 {
-        let static_eval = super::eval::evaluate(position);
+        let static_eval = self.static_eval(position);
 
         if self.is_out_of_time() {
             return static_eval;

@@ -8,6 +8,7 @@ use shakmaty::{Chess, Position};
 use crate::history::MoveHistory;
 use crate::options::EngineOptions;
 
+mod bench;
 mod history;
 mod options;
 mod search;
@@ -168,6 +169,11 @@ fn main() -> Result<(), anyhow::Error> {
                     );
                 });
                 println!("Fen: {}", pos.board().board_fen());
+            }
+            ["bench", ..] => {
+                if let Err(err) = bench::bench() {
+                    println!("Bench Failed! {:?}", err);
+                }
             }
 
             [] => {}
