@@ -68,7 +68,15 @@ impl Negamax {
             return -alpha;
         }
 
-        if position.is_insufficient_material() {
+        let original_alpha = alpha;
+        let hash = position.zobrist_hash(shakmaty::EnPassantMode::Legal);
+
+        let mut history = *history;
+        history.push_hash(hash);
+
+        // threefold detection
+        let count = history.count_item(&hash);
+        if count >= 2 && ply > 0 || position.is_insufficient_material() {
             return 0;
         }
 
@@ -78,23 +86,11 @@ impl Negamax {
         if !is_check && !is_root {
             // reverse futility pruning
             let static_eval = super::eval::evaluate(position);
-            let margin = 150 * depth;
+            let margin = 80 * depth;
 
             if depth <= 4 && static_eval >= beta + margin as i32 {
                 return static_eval;
             }
-        }
-
-        let original_alpha = alpha;
-        let hash = position.zobrist_hash(shakmaty::EnPassantMode::Legal);
-
-        let mut history = *history;
-        history.push_hash(hash);
-
-        // threefold detection
-        let count = history.count_item(&hash);
-        if count >= 2 && ply > 0 {
-            return 0;
         }
 
         let tt_index = get_ttindex(hash, self.table_length);
@@ -130,22 +126,6 @@ impl Negamax {
                 return 0;
             }
         }
-
-        // if !is_check && !is_root {
-        //     //  int static_eval = evaluate_pos(pos);
-        //     //  int RFP_margin = beta + 80 * depth;
-        //     //  if (depth <= 4 && static_eval >= RFP_margin) {
-        //     //     return static_eval;
-        //     //  }
-        //     // reverse futility pruning
-        //     if tt_entry.best_move.is_some() {
-        //         let static_eval = super::eval::evaluate(position);
-        //         let margin = 150 * depth as i32;
-        //         if depth <= 4 && static_eval >= beta + margin {
-        //             return static_eval;
-        //         }
-        //     }
-        // }
 
         let mut best_move = None;
         for mov in moves.into_iter() {
