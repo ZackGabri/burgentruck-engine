@@ -98,6 +98,7 @@ impl Negamax {
         mut alpha: i32,
         beta: i32,
         pv: &mut PVariation,
+        pv_node: bool,
     ) -> i32 {
         if depth == 0 {
             return self.quiescence(position, &mut alpha, beta);
@@ -126,6 +127,7 @@ impl Negamax {
         let tt_entry = self.transposition_table[tt_index];
         let replace_tt = tt_entry.depth < depth || tt_entry.hash != hash;
 
+        // tt probing and cutoffs
         if tt_entry.depth >= depth && tt_entry.hash == hash {
             match tt_entry.bound {
                 TTBound::Exact => return tt_entry.score,
@@ -169,6 +171,7 @@ impl Negamax {
                         -beta,
                         -beta + 1,
                         pv,
+                        false,
                     );
 
                     // Make sure it's not a mate score
@@ -195,19 +198,39 @@ impl Negamax {
 
         let mut best_move = None;
         let mut child_pv = PVariation::default();
-        pv.length = 0; // ensure fresh pv
-        for mov in moves.into_iter() {
+        for (index, mov) in moves.into_iter().enumerate() {
             let position = position.clone().play(mov).unwrap();
-            let score = -self.negamax(
-                &position,
-                &history.clone(),
-                depth - 1,
-                ply + 1,
-                -beta,
-                -alpha,
-                &mut child_pv,
-            );
             self.node_count += 1;
+            let mut score = -MATE_SCORE;
+
+            // Principal variation search (PVS)
+            // If we are in a non-PV node, OR we are in a PV-node examining moves after the 1st legal move
+            if !pv_node || index > 0 {
+                // Perform zero-window search (ZWS) on non-PV nodes
+                score = -self.negamax(
+                    &position,
+                    &history.clone(),
+                    depth - 1,
+                    ply + 1,
+                    -alpha - 1,
+                    -alpha,
+                    &mut child_pv,
+                    false,
+                );
+            }
+            // We are in a PV node and either it's the first legal move, OR the ZWS failed high
+            if pv_node && (index == 0 || score > alpha) {
+                score = -self.negamax(
+                    &position,
+                    &history.clone(),
+                    depth - 1,
+                    ply + 1,
+                    -beta,
+                    -alpha,
+                    &mut child_pv,
+                    true,
+                );
+            }
 
             if score > max {
                 max = score;
