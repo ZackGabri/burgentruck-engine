@@ -96,7 +96,7 @@ pub fn search(
             break;
         }
 
-        let score = negamax.negamax(position, history, depth, 0, -MATE_SCORE, MATE_SCORE);
+        let score = negamax.negamax(position, history, depth, 0, -MATE_SCORE, MATE_SCORE, true);
 
         let duration = start.elapsed();
 
