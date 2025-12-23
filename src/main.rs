@@ -7,6 +7,7 @@ use shakmaty::{Chess, Position};
 
 use crate::history::MoveHistory;
 use crate::options::EngineOptions;
+use crate::search::SearchOptions;
 
 mod bench;
 mod history;
@@ -26,6 +27,14 @@ fn main() -> Result<(), anyhow::Error> {
     let stdin = io::stdin();
     let mut stdout = io::stdout();
     let mut history = MoveHistory::new();
+
+    // bench
+    if let Some(arg) = std::env::args().nth(1)
+        && arg == "bench"
+    {
+        bench::bench()?;
+        std::process::exit(0);
+    }
 
     loop {
         let mut line = String::new();
@@ -104,34 +113,29 @@ fn main() -> Result<(), anyhow::Error> {
                 _ => {}
             },
 
-            ["go", "nodes", val] => {
-                let best_move = search::search(&pos, Some(&history), None, val.parse().ok(), None);
+            ["go", "movetime", val] => {
+                let search_options = SearchOptions {
+                    max_time: val.parse().ok(),
+                    ..Default::default()
+                };
+                let (m, _) = search::search(&pos, Some(&history), search_options);
 
-                if let Some(best_move) = best_move {
-                    println!("bestmove {}", best_move.to_uci(pos.castles().mode()));
-                }
-            }
-            ["go", "depth", val] => {
-                let best_move = search::search(&pos, Some(&history), val.parse().ok(), None, None);
-
-                if let Some(best_move) = best_move {
-                    println!("bestmove {}", best_move.to_uci(pos.castles().mode()));
-                }
-            }
-            ["go", "movetime", time] => {
-                let time = time.parse().ok();
-                let best_move = search::search(&pos, Some(&history), None, None, time);
-
-                if let Some(best_move) = best_move {
+                if let Some(best_move) = m {
                     println!("bestmove {}", best_move.to_uci(pos.castles().mode()));
                 }
             }
             ["go", args @ ..] => {
-                let time_args = args.chunks(2);
-                let mut time = search::negamax::TimeControl::default();
+                let search_args = args.chunks(2);
 
-                for arg in time_args {
+                let mut time = search::negamax::TimeControl::default();
+                let mut max_depth = None;
+                let mut max_nodes = None;
+
+                for arg in search_args {
                     match arg {
+                        ["nodes", nodes] => max_nodes = nodes.parse().ok(),
+                        ["depth", depth] => max_depth = depth.parse().ok(),
+
                         ["wtime", wtime] => time.w_time = wtime.parse().unwrap_or_default(),
                         ["btime", btime] => time.b_time = btime.parse().unwrap_or_default(),
                         ["winc", inc] => time.w_inc = inc.parse().unwrap_or_default(),
@@ -140,10 +144,16 @@ fn main() -> Result<(), anyhow::Error> {
                     }
                 }
 
-                let time = search::allocate_time(&pos, &time, (history.index + 1) as u64);
-                let best_move = search::search(&pos, Some(&history), None, None, time);
+                let search_options = SearchOptions {
+                    max_time: search::allocate_time(&pos, &time, (history.index + 1) as u64),
+                    max_depth,
+                    max_nodes,
+                    ..Default::default()
+                };
 
-                if let Some(best_move) = best_move {
+                let (m, _) = search::search(&pos, Some(&history), search_options);
+
+                if let Some(best_move) = m {
                     println!("bestmove {}", best_move.to_uci(pos.castles().mode()));
                 }
             }

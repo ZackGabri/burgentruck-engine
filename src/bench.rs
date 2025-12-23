@@ -3,9 +3,7 @@ use std::time::Instant;
 use shakmaty::Chess;
 use shakmaty::fen::Fen;
 
-use crate::history::MoveHistory;
-use crate::search::negamax::Negamax;
-use crate::search::{DEFAULT_ALPHA, DEFAULT_BETA};
+use crate::search::SearchOptions;
 
 const BENCH_POSITIONS: [&str; 50] = [
     "r3k2r/2pb1ppp/2pp1q2/p7/1nP1B3/1P2P3/P2N1PPP/R2QK2R w KQkq a6 0 14",
@@ -63,7 +61,7 @@ const BENCH_POSITIONS: [&str; 50] = [
 const BENCH_DEPTH: usize = 5;
 
 pub fn bench() -> anyhow::Result<()> {
-    let mut node_count = 0;
+    let mut total_nodes = 0;
     let bench_start = Instant::now();
 
     for (i, fen_string) in BENCH_POSITIONS.iter().enumerate() {
@@ -72,33 +70,28 @@ pub fn bench() -> anyhow::Result<()> {
         let fen: Fen = fen_string.parse()?;
         let pos: Chess = fen.into_position(shakmaty::CastlingMode::Standard)?;
 
-        let mut negamax = Negamax::new();
-        for depth in 1..=BENCH_DEPTH {
-            negamax.negamax(
-                &pos,
-                &MoveHistory::new(),
-                depth,
-                0,
-                DEFAULT_ALPHA,
-                DEFAULT_BETA,
-            );
-        }
+        let search_options = SearchOptions {
+            max_depth: Some(BENCH_DEPTH),
+            bench: true,
+            ..Default::default()
+        };
+        let (_, node_count) = crate::search::search(&pos, None, search_options);
 
         let duration = start_time.elapsed();
-        node_count += negamax.node_count;
+        total_nodes += node_count;
 
         println!(
             "position {:2}/{:2}: nodes {} time {}",
             i + 1,
             BENCH_POSITIONS.len(),
-            negamax.node_count,
+            node_count,
             duration.as_millis()
         );
     }
     let bench_duration = bench_start.elapsed().as_millis();
-
+    let nps = total_nodes / bench_duration as usize;
     println!("--------------------------------");
-    println!("Total bench nodes: {node_count}");
-    println!("Total bench time: {bench_duration}");
+    println!("Total bench duration: {bench_duration}");
+    println!("{total_nodes} nodes {nps} nps");
     Ok(())
 }

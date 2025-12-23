@@ -1,6 +1,6 @@
 use shakmaty::zobrist::Zobrist64;
 
-use crate::search::eval::MATE_SCORE;
+use crate::search::MATE_SCORE;
 
 pub type TTHash = Zobrist64;
 

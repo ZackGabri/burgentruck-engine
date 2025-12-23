@@ -7,7 +7,7 @@ use shakmaty::{Chess, Move, MoveList, Position};
 
 use crate::engine_options;
 use crate::history::MoveHistory;
-use crate::search::eval::MATE_SCORE;
+use crate::search::MATE_SCORE;
 use crate::transposition_table::{TTBound, TTEntry, get_ttindex};
 
 #[derive(Default, Debug)]
@@ -24,8 +24,8 @@ pub struct Negamax {
     pub pv_line: Vec<Option<Move>>,
     transposition_table: Box<[TTEntry]>, // o
     table_length: usize,
+    table_entries: usize,
     rng: SmallRng,
-
     deadline: Option<Instant>, // deadline for the search to stop at
 }
 
@@ -42,6 +42,8 @@ impl Negamax {
             node_count: 0,
             transposition_table: vec![TTEntry::default(); table_length].into_boxed_slice(),
             table_length,
+            table_entries: 0,
+
             pv_line: vec![None; 100],
             rng: SmallRng::from_seed([0; 32]),
 
@@ -190,6 +192,10 @@ impl Negamax {
         }
 
         if replace_tt {
+            if tt_entry.hash == 0.into() {
+                self.table_entries += 1;
+            }
+
             let bound = if max <= original_alpha {
                 TTBound::Upper
             } else if max >= beta {
@@ -284,5 +290,9 @@ impl Negamax {
                 100000 // aka show all normal moves last
             }
         });
+    }
+
+    pub fn hashfull(&self) -> usize {
+        (self.table_entries * 1000) / self.table_length
     }
 }
