@@ -197,11 +197,12 @@ impl Negamax {
         }
 
         let mut best_move = None;
-        let mut child_pv = PVariation::default();
         for (index, mov) in moves.into_iter().enumerate() {
             let position = position.clone().play(mov).unwrap();
             self.node_count += 1;
+
             let mut score = -MATE_SCORE;
+            let mut child_pv = PVariation::default();
 
             // Principal variation search (PVS)
             // If we are in a non-PV node, OR we are in a PV-node examining moves after the 1st legal move
