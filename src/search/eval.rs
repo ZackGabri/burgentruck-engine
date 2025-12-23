@@ -2,6 +2,7 @@ use rand::{Rng, rngs::SmallRng};
 use shakmaty::{Chess, Color, Position, Role, Square};
 
 pub const MATE_SCORE: i32 = 100_000;
+pub const MATE_THRESHOLD: i32 = MATE_SCORE - 1000;
 
 pub const PAWN_VALUE: i32 = 100;
 pub const KNIGHT_VALUE: i32 = 320;

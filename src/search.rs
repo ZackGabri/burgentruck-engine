@@ -1,16 +1,52 @@
 use crate::history::MoveHistory;
 use crate::search::eval::MATE_SCORE;
+use crate::search::eval::MATE_THRESHOLD;
 
 use negamax::{Negamax, TimeControl};
 
 use shakmaty::{Chess, Color, Move, Position};
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 pub mod eval;
 pub mod negamax;
 
 pub const DEFAULT_ALPHA: i32 = -MATE_SCORE;
 pub const DEFAULT_BETA: i32 = MATE_SCORE;
+
+// Helper function to print search info
+fn print_info(
+    depth: usize,
+    best_score: i32,
+    node_count: usize,
+    duration: Duration,
+    pv_line: &[Option<Move>],
+    position: &Chess,
+) {
+    let nps = (node_count as f64 / duration.as_secs_f64()) as usize;
+    let time_ms = duration.as_millis();
+
+    let pv = pv_line
+        .iter()
+        .flatten()
+        .map(|m| m.to_uci(position.castles().mode()).to_string())
+        .collect::<Vec<_>>()
+        .join(" ");
+
+    if best_score.abs() >= MATE_THRESHOLD {  // safe mate detection range
+        let mate_in = if best_score > 0 {
+            (MATE_SCORE - best_score + 1) / 2
+        } else {
+            -(MATE_SCORE + best_score + 1) / 2
+        };
+        println!(
+            "info depth {depth} score mate {mate_in} nodes {node_count} nps {nps} time {time_ms} pv {pv}"
+        );
+    } else {
+        println!(
+            "info depth {depth} score cp {best_score} nodes {node_count} nps {nps} time {time_ms} pv {pv}"
+        );
+    }
+}
 
 pub fn search(
     position: &Chess,
@@ -40,18 +76,14 @@ pub fn search(
         let best_score = negamax.negamax(position, history, depth, 0, DEFAULT_ALPHA, DEFAULT_BETA);
         let duration = start.elapsed();
 
-        println!(
-            "info depth {depth} score cp {best_score} nodes {} nps {} time {} pv {}",
+        print_info(
+            depth,
+            best_score,
             negamax.node_count,
-            (negamax.node_count as f64 / duration.as_secs_f64()) as usize,
-            duration.as_millis(),
-            negamax
-                .pv_line
-                .iter()
-                .filter_map(|x| x.map(|x| x.to_uci(position.castles().mode()).to_string()))
-                .collect::<Vec<String>>()
-                .join(" ")
-        );
+            duration,
+            &negamax.pv_line,
+            position,
+        );      
 
         if negamax.is_out_of_time() {
             break;
