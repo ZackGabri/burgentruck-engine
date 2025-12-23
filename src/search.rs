@@ -7,16 +7,25 @@ use std::time::{Duration, Instant};
 pub mod eval;
 pub mod negamax;
 
+pub const MATE_SCORE: i32 = 100_000;
+pub const MATE_THRESHOLD: i32 = MATE_SCORE - 1000;
+
 // Helper function to print search info
 fn print_info(
     depth: usize,
     best_score: i32,
-    node_count: usize,
     duration: Duration,
-    pv_line: &[Option<Move>],
     position: &Chess,
+    negamax: &Negamax,
 ) {
-    let nps = (node_count as f64 / duration.as_secs_f64()) as usize;
+    let Negamax {
+        node_count,
+        pv_line,
+        ..
+    } = negamax;
+
+    let hashfull = negamax.hashfull();
+    let nps = (*node_count as f64 / duration.as_secs_f64()) as usize;
     let time_ms = duration.as_millis();
 
     let pv = pv_line
@@ -26,24 +35,22 @@ fn print_info(
         .collect::<Vec<_>>()
         .join(" ");
 
-    if best_score.abs() >= MATE_THRESHOLD {
+    let score_string = if best_score.abs() >= MATE_THRESHOLD {
         // safe mate detection range
         let mate_in = if best_score > 0 {
             (MATE_SCORE - best_score + 1) / 2
         } else {
             -(MATE_SCORE + best_score + 1) / 2
         };
-        println!(
-            "info depth {depth} score mate {mate_in} nodes {node_count} nps {nps} time {time_ms} pv {pv}"
-        );
+        format!("mate {mate_in}")
     } else {
-        println!(
-            "info depth {depth} score cp {best_score} nodes {node_count} nps {nps} time {time_ms} pv {pv}"
-        );
-    }
+        format!("cp {best_score}")
+    };
+
+    println!(
+        "info depth {depth} score {score_string} nodes {node_count} nps {nps} hashfull {hashfull} time {time_ms} pv {pv}"
+    );
 }
-pub const MATE_SCORE: i32 = 100_000;
-pub const MATE_THRESHOLD: i32 = MATE_SCORE - 1000;
 
 #[derive(Default)]
 pub struct SearchOptions {
@@ -93,14 +100,9 @@ pub fn search(
 
         let duration = start.elapsed();
 
-        print_info(
-            depth,
-            score,
-            negamax.node_count,
-            duration,
-            &negamax.pv_line,
-            position,
-        );      
+        if !bench {
+            print_info(depth, score, duration, position, &negamax);
+        }
 
         if negamax.is_out_of_time() {
             break;
