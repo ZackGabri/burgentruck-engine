@@ -73,7 +73,7 @@ pub fn search(
     }
 
     for depth in 1..=max_depth {
-        let best_score = negamax.negamax(position, history, depth, 0, DEFAULT_ALPHA, DEFAULT_BETA);
+        let best_score = negamax.negamax(position, history, depth, 0, DEFAULT_ALPHA, DEFAULT_BETA, true);
         let duration = start.elapsed();
 
         print_info(

@@ -81,6 +81,7 @@ pub fn bench() -> anyhow::Result<()> {
                 0,
                 DEFAULT_ALPHA,
                 DEFAULT_BETA,
+                true,
             );
         }
 
