@@ -95,7 +95,7 @@ pub fn search(
             -MATE_SCORE,
             MATE_SCORE,
             &mut pv,
-            true
+            true,
         );
 
         let duration = start.elapsed();

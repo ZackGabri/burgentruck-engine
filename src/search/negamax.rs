@@ -54,9 +54,12 @@ pub struct TimeControl {
 // struct for shared data between every negamax call
 pub struct Negamax {
     pub node_count: usize,
-    transposition_table: Box<[TTEntry]>, // o
-    table_length: usize,
-    table_entries: usize,
+    transposition_table: Box<[TTEntry]>,
+    ttable_length: usize,
+    ttable_entries: usize,
+
+    history_table: [[[i32; 64]; 64]; 2],
+
     rng: SmallRng,
     deadline: Option<Instant>, // deadline for the search to stop at
 }
@@ -73,8 +76,10 @@ impl Negamax {
         Self {
             node_count: 0,
             transposition_table: vec![TTEntry::default(); table_length].into_boxed_slice(),
-            table_length,
-            table_entries: 0,
+            ttable_length: table_length,
+            ttable_entries: 0,
+
+            history_table: [[[0; 64]; 64]; 2],
 
             rng: SmallRng::from_seed([0; 32]),
 
@@ -123,7 +128,7 @@ impl Negamax {
         let is_check = position.is_check();
         let is_root = ply == 0;
 
-        let tt_index = get_ttindex(hash, self.table_length);
+        let tt_index = get_ttindex(hash, self.ttable_length);
         let tt_entry = self.transposition_table[tt_index];
         let replace_tt = tt_entry.depth < depth || tt_entry.hash != hash;
 
@@ -183,8 +188,7 @@ impl Negamax {
         }
 
         let mut max = -MATE_SCORE;
-        let mut moves = position.legal_moves();
-        self.sort_moves(&mut moves, &tt_entry.best_move);
+        let moves = self.get_sorted_moves(position, &tt_entry.best_move);
 
         if moves.is_empty() {
             if is_check {
@@ -247,13 +251,24 @@ impl Negamax {
             }
 
             if score >= beta {
+                if mov.capture().is_none() {
+                    let from = match mov.from() {
+                        Some(v) => v,
+                        None => break,
+                    } as usize;
+                    let to = mov.to() as usize;
+                    let turn = position.turn() as usize;
+
+                    self.history_table[turn][from][to] += (depth * depth) as i32;
+                }
+
                 break;
             }
         }
 
         if replace_tt {
             if tt_entry.hash == 0.into() {
-                self.table_entries += 1;
+                self.ttable_entries += 1;
             }
 
             let bound = if max <= original_alpha {
@@ -328,18 +343,33 @@ impl Negamax {
         best_value
     }
 
-    fn sort_moves(&self, moves: &mut MoveList, hash_move: &Option<Move>) {
-        if moves.is_empty() {
-            return;
-        }
+    fn get_sorted_moves(&self, position: &Chess, hash_move: &Option<Move>) -> MoveList {
+        let mut move_list = position.legal_moves();
+        let turn = position.turn() as usize;
 
-        self.sort_captures(moves);
+        move_list.sort_by_key(|m| {
+            if let Some(hash_move) = hash_move
+                && m == hash_move
+            {
+                return -9999999; // hash moves always first
+            }
 
-        if let Some(best) = hash_move
-            && let Some(best_move_index) = moves.iter().position(|m| m == best)
-        {
-            moves.swap(0, best_move_index);
-        }
+            // if the move is a capture then sort it based on the MMV-LVA table
+            if let Some(victim) = m.capture() {
+                // +50000 so it's ahead of the normal moves
+                return -(super::eval::MMV_LVA[victim as usize - 1][m.role() as usize - 1] + 50000);
+            };
+
+            // otherwise sort it based on the history table
+            let from = match m.from() {
+                Some(v) => v,
+                None => return 0,
+            } as usize;
+            let to = m.to() as usize;
+            -self.history_table[turn][from][to]
+        });
+
+        move_list
     }
 
     fn sort_captures(&self, moves: &mut MoveList) {
@@ -353,6 +383,6 @@ impl Negamax {
     }
 
     pub fn hashfull(&self) -> usize {
-        (self.table_entries * 1000) / self.table_length
+        (self.ttable_entries * 1000) / self.ttable_length
     }
 }
