@@ -1,4 +1,4 @@
-use crate::history::MoveHistory;
+use crate::{history::MoveHistory, search::negamax::PVariation};
 use negamax::{Negamax, TimeControl};
 
 use shakmaty::{Chess, Color, Move, Position};
@@ -9,31 +9,21 @@ pub mod negamax;
 
 pub const MATE_SCORE: i32 = 100_000;
 pub const MATE_THRESHOLD: i32 = MATE_SCORE - 1000;
+pub const MAX_PLY: usize = 128;
 
 // Helper function to print search info
 fn print_info(
     depth: usize,
     best_score: i32,
     duration: Duration,
-    position: &Chess,
     negamax: &Negamax,
+    pv: &PVariation,
 ) {
-    let Negamax {
-        node_count,
-        pv_line,
-        ..
-    } = negamax;
+    let Negamax { node_count, .. } = negamax;
 
     let hashfull = negamax.hashfull();
     let nps = (*node_count as f64 / duration.as_secs_f64()) as usize;
     let time_ms = duration.as_millis();
-
-    let pv = pv_line
-        .iter()
-        .flatten()
-        .map(|m| m.to_uci(position.castles().mode()).to_string())
-        .collect::<Vec<_>>()
-        .join(" ");
 
     let score_string = if best_score.abs() >= MATE_THRESHOLD {
         // safe mate detection range
@@ -91,17 +81,26 @@ pub fn search(
         negamax.set_time(time);
     }
 
+    let mut pv = PVariation::default();
     for depth in 1..=max_depth {
         if negamax.is_out_of_time() {
             break;
         }
 
-        let score = negamax.negamax(position, history, depth, 0, -MATE_SCORE, MATE_SCORE);
+        let score = negamax.negamax(
+            position,
+            history,
+            depth,
+            0,
+            -MATE_SCORE,
+            MATE_SCORE,
+            &mut pv,
+        );
 
         let duration = start.elapsed();
 
         if !bench {
-            print_info(depth, score, duration, position, &negamax);
+            print_info(depth, score, duration, &negamax, &pv);
         }
 
         if negamax.is_out_of_time() {
@@ -112,7 +111,7 @@ pub fn search(
         }
     }
 
-    (negamax.pv_line[0], negamax.node_count)
+    (pv.line[0], negamax.node_count)
 }
 
 pub fn allocate_time(position: &Chess, time: &TimeControl, played_moves: u64) -> Option<u64> {

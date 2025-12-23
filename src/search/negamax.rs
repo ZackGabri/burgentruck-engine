@@ -7,8 +7,41 @@ use shakmaty::{Chess, Move, MoveList, Position};
 
 use crate::engine_options;
 use crate::history::MoveHistory;
-use crate::search::MATE_SCORE;
+use crate::search::{MATE_SCORE, MAX_PLY};
 use crate::transposition_table::{TTBound, TTEntry, get_ttindex};
+
+pub struct PVariation {
+    pub length: usize,
+    pub line: [Option<Move>; MAX_PLY],
+}
+
+impl Default for PVariation {
+    fn default() -> Self {
+        Self {
+            length: 0,
+            line: [None; MAX_PLY],
+        }
+    }
+}
+
+impl std::fmt::Display for PVariation {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut output = String::new();
+
+        for i in 0..self.length {
+            if let Some(m) = self.line[i] {
+                output += &m.to_uci(shakmaty::CastlingMode::Standard).to_string();
+
+                // add spaces between unless it's last move
+                if i != self.length - 1 {
+                    output += " ";
+                }
+            }
+        }
+
+        write!(f, "{output}")
+    }
+}
 
 #[derive(Default, Debug)]
 pub struct TimeControl {
@@ -21,7 +54,6 @@ pub struct TimeControl {
 // struct for shared data between every negamax call
 pub struct Negamax {
     pub node_count: usize,
-    pub pv_line: Vec<Option<Move>>,
     transposition_table: Box<[TTEntry]>, // o
     table_length: usize,
     table_entries: usize,
@@ -44,7 +76,6 @@ impl Negamax {
             table_length,
             table_entries: 0,
 
-            pv_line: vec![None; 100],
             rng: SmallRng::from_seed([0; 32]),
 
             deadline: None,
@@ -66,6 +97,7 @@ impl Negamax {
         ply: usize,
         mut alpha: i32,
         beta: i32,
+        pv: &mut PVariation,
     ) -> i32 {
         if depth == 0 {
             return self.quiescence(position, &mut alpha, beta);
@@ -136,6 +168,7 @@ impl Negamax {
                         ply + 1,
                         -beta,
                         -beta + 1,
+                        pv,
                     );
 
                     // Make sure it's not a mate score
@@ -161,6 +194,8 @@ impl Negamax {
         }
 
         let mut best_move = None;
+        let mut child_pv = PVariation::default();
+        pv.length = 0; // ensure fresh pv
         for mov in moves.into_iter() {
             let position = position.clone().play(mov).unwrap();
             let score = -self.negamax(
@@ -170,6 +205,7 @@ impl Negamax {
                 ply + 1,
                 -beta,
                 -alpha,
+                &mut child_pv,
             );
             self.node_count += 1;
 
@@ -177,11 +213,11 @@ impl Negamax {
                 max = score;
                 best_move = Some(mov);
 
-                if is_root {
-                    self.pv_line[0] = Some(mov);
-                }
-
                 if score > alpha {
+                    pv.length = 1 + child_pv.length;
+                    pv.line[0] = Some(mov);
+                    pv.line[1..pv.length + 1].copy_from_slice(&child_pv.line[0..pv.length]);
+
                     alpha = score;
                 }
             }
