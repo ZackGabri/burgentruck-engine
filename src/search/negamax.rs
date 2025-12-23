@@ -171,7 +171,7 @@ impl Negamax {
 
             // Principal variation search (PVS)
             // If we are in a non-PV node, OR we are in a PV-node examining moves after the 1st legal move
-            if !pv_node || index > 1 {
+            if !pv_node || index > 0 {
                 // Perform zero-window search (ZWS) on non-PV nodes
                 score = -self.negamax(
                     &position,
@@ -184,7 +184,7 @@ impl Negamax {
                 );
             }
             // We are in a PV node and either it's the first legal move, OR the ZWS failed high
-            if pv_node && (index == 1 || score > alpha) {
+            if pv_node && (index == 0 || score > alpha) {
                 score = -self.negamax(
                     &position,
                     &history.clone(),
