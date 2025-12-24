@@ -1,4 +1,4 @@
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 use rand::SeedableRng;
 use rand::rngs::SmallRng;
@@ -43,14 +43,6 @@ impl std::fmt::Display for PVariation {
     }
 }
 
-#[derive(Default, Debug)]
-pub struct TimeControl {
-    pub w_time: u64,
-    pub b_time: u64,
-    pub w_inc: u64,
-    pub b_inc: u64,
-}
-
 // struct for shared data between every negamax call
 pub struct Negamax {
     pub node_count: usize,
@@ -61,7 +53,7 @@ pub struct Negamax {
     history_table: [[[i32; 64]; 64]; 2],
 
     rng: SmallRng,
-    deadline: Option<Instant>, // deadline for the search to stop at
+    pub deadline: Option<Instant>, // deadline for the search to stop at
 }
 
 impl Negamax {
@@ -84,12 +76,6 @@ impl Negamax {
             rng: SmallRng::from_seed([0; 32]),
 
             deadline: None,
-        }
-    }
-
-    pub fn set_time(&mut self, duration: u64) {
-        if duration != 0 {
-            self.deadline = Some(Instant::now() + Duration::from_millis(duration));
         }
     }
 
@@ -200,22 +186,26 @@ impl Negamax {
             }
         }
 
+        pv.length = 0;
         let mut best_move = None;
-        for (index, mov) in moves.into_iter().enumerate() {
+        for (move_index, mov) in moves.into_iter().enumerate() {
             let position = position.clone().play(mov).unwrap();
             self.node_count += 1;
 
             let mut score = -MATE_SCORE;
             let mut child_pv = PVariation::default();
 
+            let depth_reduction = 1;
+            let depth = depth.saturating_sub(depth_reduction);
+
             // Principal variation search (PVS)
             // If we are in a non-PV node, OR we are in a PV-node examining moves after the 1st legal move
-            if !pv_node || index > 0 {
+            if !pv_node || move_index > 0 {
                 // Perform zero-window search (ZWS) on non-PV nodes
                 score = -self.negamax(
                     &position,
                     &history.clone(),
-                    depth - 1,
+                    depth,
                     ply + 1,
                     -alpha - 1,
                     -alpha,
@@ -224,11 +214,11 @@ impl Negamax {
                 );
             }
             // We are in a PV node and either it's the first legal move, OR the ZWS failed high
-            if pv_node && (index == 0 || score > alpha) {
+            if pv_node && (move_index == 0 || score > alpha) {
                 score = -self.negamax(
                     &position,
                     &history.clone(),
-                    depth - 1,
+                    depth,
                     ply + 1,
                     -beta,
                     -alpha,

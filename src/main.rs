@@ -1,5 +1,6 @@
 use std::io::{self, Write};
 use std::sync::OnceLock;
+use std::time::{Duration, Instant};
 
 use shakmaty::fen::Fen;
 use shakmaty::uci::UciMove;
@@ -39,6 +40,8 @@ fn main() -> Result<(), anyhow::Error> {
     loop {
         let mut line = String::new();
         stdin.read_line(&mut line).unwrap();
+
+        let start_time = Instant::now();
 
         let tokens = line.split_ascii_whitespace().collect::<Vec<_>>();
 
@@ -115,7 +118,10 @@ fn main() -> Result<(), anyhow::Error> {
 
             ["go", "movetime", val] => {
                 let search_options = SearchOptions {
-                    max_time: val.parse().ok(),
+                    deadline: val
+                        .parse()
+                        .map(|val| Instant::now() + Duration::from_millis(val))
+                        .ok(),
                     ..Default::default()
                 };
                 let (m, _) = search::search(&pos, Some(&history), search_options);
@@ -127,7 +133,7 @@ fn main() -> Result<(), anyhow::Error> {
             ["go", args @ ..] => {
                 let search_args = args.chunks(2);
 
-                let mut time = search::negamax::TimeControl::default();
+                let mut time = search::TimeControl::default();
                 let mut max_depth = None;
                 let mut max_nodes = None;
 
@@ -145,7 +151,11 @@ fn main() -> Result<(), anyhow::Error> {
                 }
 
                 let search_options = SearchOptions {
-                    max_time: search::allocate_time(&pos, &time, (history.index + 1) as u64),
+                    deadline: time.into_deadline(
+                        start_time,
+                        pos.turn(),
+                        (history.index + 1) as u64,
+                    ),
                     max_depth,
                     max_nodes,
                     ..Default::default()

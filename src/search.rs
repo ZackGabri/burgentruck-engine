@@ -1,7 +1,7 @@
 use crate::{history::MoveHistory, search::negamax::PVariation};
-use negamax::{Negamax, TimeControl};
+use negamax::Negamax;
 
-use shakmaty::{Chess, Color, Move, Position};
+use shakmaty::{Chess, Color, Move};
 use std::time::{Duration, Instant};
 
 pub mod eval;
@@ -46,7 +46,7 @@ fn print_info(
 pub struct SearchOptions {
     pub max_depth: Option<usize>,
     pub max_nodes: Option<usize>,
-    pub max_time: Option<u64>,
+    pub deadline: Option<Instant>,
     pub bench: bool,
 }
 
@@ -58,12 +58,15 @@ pub fn search(
     let SearchOptions {
         max_nodes,
         max_depth,
-        max_time,
+        deadline,
         bench,
     } = search_options;
 
+    let mut negamax = Negamax::new();
+    negamax.deadline = deadline;
+
     let max_depth = max_depth.unwrap_or_else(|| {
-        if max_nodes.is_some() || max_time.is_some() {
+        if max_nodes.is_some() || deadline.is_some() {
             100
         } else {
             crate::engine_options().get_number("Default Depth")
@@ -74,12 +77,7 @@ pub fn search(
     let default_history = MoveHistory::default();
     let history = history.unwrap_or(&default_history);
 
-    let mut negamax = Negamax::new();
     let start = Instant::now();
-
-    if let Some(time) = max_time {
-        negamax.set_time(time);
-    }
 
     let mut pv = PVariation::default();
     for depth in 1..=max_depth {
@@ -98,9 +96,8 @@ pub fn search(
             true,
         );
 
-        let duration = start.elapsed();
-
         if !bench {
+            let duration = start.elapsed();
             print_info(depth, score, duration, &negamax, &pv);
         }
 
@@ -115,12 +112,33 @@ pub fn search(
     (pv.line[0], negamax.node_count)
 }
 
-pub fn allocate_time(position: &Chess, time: &TimeControl, played_moves: u64) -> Option<u64> {
-    let divisor = 30.max(60_u64.saturating_sub(played_moves));
+#[derive(Default, Debug)]
+pub struct TimeControl {
+    pub w_time: u64,
+    pub b_time: u64,
+    pub w_inc: u64,
+    pub b_inc: u64,
+}
 
-    match position.turn() {
-        Color::Black if time.b_time > 0 => Some((time.b_time / divisor) + (time.b_inc / 2)),
-        Color::White if time.w_time > 0 => Some((time.w_time / divisor) + (time.w_inc / 2)),
-        _ => None,
+impl TimeControl {
+    pub fn into_deadline(
+        self,
+        start_time: Instant,
+        turn: Color,
+        played_moves: u64,
+    ) -> Option<Instant> {
+        let divisor = 30.max(60_u64.saturating_sub(played_moves));
+
+        let duration = match turn {
+            Color::Black if self.b_time > 0 => (self.b_time / divisor) + (self.b_inc / 2),
+            Color::White if self.w_time > 0 => (self.w_time / divisor) + (self.w_inc / 2),
+            _ => 0,
+        };
+
+        if duration > 0 {
+            Some(start_time + Duration::from_millis(duration))
+        } else {
+            None
+        }
     }
 }
