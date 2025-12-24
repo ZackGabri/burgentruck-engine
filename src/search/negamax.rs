@@ -1,3 +1,4 @@
+use std::sync::OnceLock;
 use std::time::Instant;
 
 use rand::SeedableRng;
@@ -7,7 +8,7 @@ use shakmaty::{Chess, Move, MoveList, Position};
 
 use crate::engine_options;
 use crate::history::MoveHistory;
-use crate::search::{MATE_SCORE, MAX_PLY};
+use crate::search::{MATE_SCORE, MATE_THRESHOLD, MAX_PLY, MAX_PSUEDO_MOVES};
 use crate::transposition_table::{TTBound, TTEntry, get_ttindex};
 
 pub struct PVariation {
@@ -43,6 +44,26 @@ impl std::fmt::Display for PVariation {
     }
 }
 
+// Late Move Reductions table
+static LMR_TABLE: OnceLock<[[usize; MAX_PSUEDO_MOVES]; MAX_PLY]> = OnceLock::new();
+fn init_lmr_table() -> [[usize; MAX_PSUEDO_MOVES]; MAX_PLY] {
+    let mut table = [[1; MAX_PSUEDO_MOVES]; MAX_PLY];
+
+    let mut depth = 3;
+    while depth < MAX_PLY {
+        let mut move_num = 4;
+        while move_num < MAX_PSUEDO_MOVES {
+            table[depth][move_num] =
+                (0.50 + (depth as f64).ln() * (move_num as f64).ln() / 3.0) as usize;
+
+            move_num += 1;
+        }
+        depth += 1;
+    }
+
+    table
+}
+
 // struct for shared data between every negamax call
 pub struct Negamax {
     pub node_count: usize,
@@ -51,6 +72,7 @@ pub struct Negamax {
     ttable_entries: usize,
 
     history_table: [[[i32; 64]; 64]; 2],
+    lmr_table: &'static [[usize; MAX_PSUEDO_MOVES]],
 
     rng: SmallRng,
     pub deadline: Option<Instant>, // deadline for the search to stop at
@@ -63,15 +85,16 @@ impl Negamax {
         let tt_entry_size = size_of::<TTEntry>();
 
         // calculate how many entries will fit in that memory size
-        let table_length = desired_size / tt_entry_size;
+        let tt_table_length = desired_size / tt_entry_size;
 
         Self {
             node_count: 0,
-            transposition_table: vec![TTEntry::default(); table_length].into_boxed_slice(),
-            ttable_length: table_length,
+            transposition_table: vec![TTEntry::default(); tt_table_length].into_boxed_slice(),
+            ttable_length: tt_table_length,
             ttable_entries: 0,
 
             history_table: [[[0; 64]; 64]; 2],
+            lmr_table: LMR_TABLE.get_or_init(init_lmr_table),
 
             rng: SmallRng::from_seed([0; 32]),
 
@@ -166,7 +189,7 @@ impl Negamax {
                     );
 
                     // Make sure it's not a mate score
-                    if null_score >= beta && null_score.abs() < 69000 {
+                    if null_score >= beta && null_score.abs() < MATE_THRESHOLD {
                         return null_score;
                     }
                 }
@@ -195,17 +218,45 @@ impl Negamax {
             let mut score = -MATE_SCORE;
             let mut child_pv = PVariation::default();
 
-            let depth_reduction = 1;
-            let depth = depth.saturating_sub(depth_reduction);
+            if !is_check && depth >= 3 && move_index >= 4 && alpha.abs() < MATE_THRESHOLD {
+                // Late Move Reductions (LMR)
+                let depth_reduction = self.lmr_table[depth][move_index];
+                let reduced_depth = depth.saturating_sub(depth_reduction);
 
+                // do reduced search with a null window
+                score = -self.negamax(
+                    &position,
+                    &history.clone(),
+                    reduced_depth,
+                    ply + 1,
+                    -alpha - 1,
+                    -alpha,
+                    &mut child_pv,
+                    false,
+                );
+
+                // if it fails then do a full research instead
+                if score > alpha {
+                    score = -self.negamax(
+                        &position,
+                        &history.clone(),
+                        depth - 1,
+                        ply + 1,
+                        -alpha - 1,
+                        -alpha,
+                        &mut child_pv,
+                        true,
+                    );
+                }
+            }
             // Principal variation search (PVS)
             // If we are in a non-PV node, OR we are in a PV-node examining moves after the 1st legal move
-            if !pv_node || move_index > 0 {
+            else if !pv_node || move_index > 0 {
                 // Perform zero-window search (ZWS) on non-PV nodes
                 score = -self.negamax(
                     &position,
                     &history.clone(),
-                    depth,
+                    depth - 1,
                     ply + 1,
                     -alpha - 1,
                     -alpha,
@@ -213,12 +264,13 @@ impl Negamax {
                     false,
                 );
             }
+
             // We are in a PV node and either it's the first legal move, OR the ZWS failed high
             if pv_node && (move_index == 0 || score > alpha) {
                 score = -self.negamax(
                     &position,
                     &history.clone(),
-                    depth,
+                    depth - 1,
                     ply + 1,
                     -beta,
                     -alpha,
