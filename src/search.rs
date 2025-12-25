@@ -2,7 +2,7 @@ use crate::{history::MoveHistory, search::negamax::PVariation};
 use negamax::Negamax;
 
 use shakmaty::{Chess, Color, Move, Position};
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 pub mod eval;
 pub mod negamax;
@@ -46,7 +46,7 @@ fn print_info(
 pub struct SearchOptions {
     pub max_depth: Option<usize>,
     pub max_nodes: Option<usize>,
-    pub deadline: Option<Instant>,
+    pub deadline: Option<minstant::Instant>,
     pub bench: bool,
 }
 
@@ -77,7 +77,7 @@ pub fn search(
     let default_history = MoveHistory::default();
     let history = history.unwrap_or(&default_history);
 
-    let start = Instant::now();
+    let start = minstant::Instant::now();
 
     let mut pv = PVariation::default();
     for depth in 1..=max_depth {
@@ -134,10 +134,10 @@ pub struct TimeControl {
 impl TimeControl {
     pub fn into_deadline(
         self,
-        start_time: Instant,
+        start_time: minstant::Instant,
         turn: Color,
         played_moves: u64,
-    ) -> Option<Instant> {
+    ) -> Option<minstant::Instant> {
         let divisor = 30.max(60_u64.saturating_sub(played_moves));
 
         let duration = match turn {

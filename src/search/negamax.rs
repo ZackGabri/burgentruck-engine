@@ -1,5 +1,3 @@
-use std::time::Instant;
-
 use rand::SeedableRng;
 use rand::rngs::SmallRng;
 use shakmaty::zobrist::ZobristHash;
@@ -75,7 +73,7 @@ pub struct Negamax {
     killer_move_table: [KillerMoves; MAX_PLY],
 
     rng: SmallRng,
-    pub deadline: Option<Instant>, // deadline for the search to stop at
+    pub deadline: Option<minstant::Instant>, // deadline for the search to stop at
 }
 
 impl Negamax {
@@ -314,7 +312,7 @@ impl Negamax {
 
     pub fn is_out_of_time(&self) -> bool {
         if let Some(deadline) = self.deadline
-            && Instant::now() > deadline
+            && minstant::Instant::now() > deadline
         {
             return true;
         }

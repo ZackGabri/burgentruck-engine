@@ -1,6 +1,6 @@
 use std::io::{self, Write};
 use std::sync::OnceLock;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use shakmaty::fen::Fen;
 use shakmaty::uci::UciMove;
@@ -41,7 +41,7 @@ fn main() -> Result<(), anyhow::Error> {
         let mut line = String::new();
         stdin.read_line(&mut line).unwrap();
 
-        let start_time = Instant::now();
+        let start_time = minstant::Instant::now();
 
         let tokens = line.split_ascii_whitespace().collect::<Vec<_>>();
 
@@ -120,7 +120,7 @@ fn main() -> Result<(), anyhow::Error> {
                 let search_options = SearchOptions {
                     deadline: val
                         .parse()
-                        .map(|val| Instant::now() + Duration::from_millis(val))
+                        .map(|val| minstant::Instant::now() + Duration::from_millis(val))
                         .ok(),
                     ..Default::default()
                 };

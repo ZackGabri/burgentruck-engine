@@ -1,5 +1,3 @@
-use std::time::Instant;
-
 use shakmaty::Chess;
 use shakmaty::fen::Fen;
 
@@ -70,10 +68,10 @@ pub fn bench() -> anyhow::Result<()> {
         .unwrap();
 
     let mut total_nodes = 0;
-    let bench_start = Instant::now();
+    let bench_start = minstant::Instant::now();
 
     for (i, fen_string) in BENCH_POSITIONS.iter().enumerate() {
-        let start_time = Instant::now();
+        let start_time = minstant::Instant::now();
 
         let fen: Fen = fen_string.parse()?;
         let pos: Chess = fen.into_position(shakmaty::CastlingMode::Standard)?;
