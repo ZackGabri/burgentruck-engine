@@ -218,10 +218,10 @@ impl Negamax {
             let mut score = -MATE_SCORE;
             let mut child_pv = PVariation::default();
 
-            if !is_check && depth >= 3 && move_index >= 4 && alpha.abs() < MATE_THRESHOLD {
+            if depth >= 3 && move_index >= 4 && max.abs() < MATE_THRESHOLD {
                 // Late Move Reductions (LMR)
                 let depth_reduction = self.lmr_table[depth][move_index];
-                let reduced_depth = depth.saturating_sub(depth_reduction);
+                let reduced_depth = depth.saturating_sub(1 + depth_reduction); // depth - 1 - r
 
                 // do reduced search with a null window
                 score = -self.negamax(
@@ -245,7 +245,7 @@ impl Negamax {
                         -alpha - 1,
                         -alpha,
                         &mut child_pv,
-                        true,
+                        false,
                     );
                 }
             }
