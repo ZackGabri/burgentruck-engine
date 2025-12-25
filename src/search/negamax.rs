@@ -67,7 +67,9 @@ pub struct Negamax {
     history_table: [[[i32; 64]; 64]; 2],
     killer_move_table: [KillerMoves; MAX_PLY],
 
+    #[allow(unused)]
     rng: SmallRng,
+
     pub deadline: Option<minstant::Instant>, // deadline for the search to stop at
 }
 
@@ -79,6 +81,7 @@ impl Negamax {
             killer_move_table: [KillerMoves::default(); MAX_PLY],
 
             rng: SmallRng::from_seed([0; 32]),
+
             deadline: None,
         }
     }
@@ -304,7 +307,7 @@ impl Negamax {
 
     #[inline(always)]
     fn static_eval(&mut self, position: &Chess) -> i32 {
-        super::eval::evaluate(position, &mut self.rng)
+        super::eval::evaluate(position)
     }
 
     pub fn is_out_of_time(&self) -> bool {
