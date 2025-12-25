@@ -1,7 +1,7 @@
 use crate::{history::MoveHistory, search::negamax::PVariation};
 use negamax::Negamax;
 
-use shakmaty::{Chess, Color, Move};
+use shakmaty::{Chess, Color, Move, Position};
 use std::time::{Duration, Instant};
 
 pub mod eval;
@@ -107,6 +107,17 @@ pub fn search(
         if max_nodes > 0 && negamax.node_count >= max_nodes {
             break;
         }
+    }
+
+    // if negamax failed for whatever reason, then move would be the first move in the position
+    if pv.line[0].is_none() {
+        let moves = position.legal_moves();
+        pv.line[0] = Some(moves[0]);
+        println!(
+            "info depth 69 score cp -99999 nodes {} nps {} hashfull -1 time -1 pv e2e1",
+            deadline.unwrap().elapsed().as_millis(),
+            start.elapsed().as_millis(),
+        );
     }
 
     (pv.line[0], negamax.node_count)

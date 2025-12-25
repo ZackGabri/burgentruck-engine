@@ -111,7 +111,7 @@ const PIECE_VALUES: [i32; 6] = [
     KING_VALUE,
 ];
 
-pub const MMV_LVA: [[i32; 6]; 6] = {
+pub const MVV_LVA: [[i32; 6]; 6] = {
     let mut table = [[0; 6]; 6];
 
     let mut i = 0;

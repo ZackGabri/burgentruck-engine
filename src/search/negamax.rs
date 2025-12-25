@@ -43,6 +43,27 @@ impl std::fmt::Display for PVariation {
     }
 }
 
+#[derive(Default, Clone, Copy)]
+struct KillerMoves {
+    moves: [Option<Move>; 2],
+}
+
+impl KillerMoves {
+    #[inline(always)]
+    fn insert_move(&mut self, m: Move) {
+        if self.moves[0] == Some(m) {
+            return;
+        }
+        self.moves[1] = self.moves[0];
+        self.moves[0] = Some(m);
+    }
+
+    #[inline(always)]
+    fn contains_move(&self, m: Move) -> bool {
+        self.moves[0] == Some(m) || self.moves[1] == Some(m)
+    }
+}
+
 // struct for shared data between every negamax call
 pub struct Negamax {
     pub node_count: usize,
@@ -51,6 +72,7 @@ pub struct Negamax {
     ttable_entries: usize,
 
     history_table: [[[i32; 64]; 64]; 2],
+    killer_move_table: [KillerMoves; MAX_PLY],
 
     rng: SmallRng,
     pub deadline: Option<Instant>, // deadline for the search to stop at
@@ -72,9 +94,9 @@ impl Negamax {
             ttable_entries: 0,
 
             history_table: [[[0; 64]; 64]; 2],
+            killer_move_table: [KillerMoves::default(); MAX_PLY],
 
             rng: SmallRng::from_seed([0; 32]),
-
             deadline: None,
         }
     }
@@ -174,7 +196,7 @@ impl Negamax {
         }
 
         let mut max = -MATE_SCORE;
-        let moves = self.get_sorted_moves(position, &tt_entry.best_move);
+        let moves = self.get_sorted_moves(position, ply, &tt_entry.best_move);
 
         if moves.is_empty() {
             if is_check {
@@ -189,7 +211,9 @@ impl Negamax {
         pv.length = 0;
         let mut best_move = None;
         for (move_index, mov) in moves.into_iter().enumerate() {
-            let position = position.clone().play(mov).unwrap();
+            let mut position = position.clone();
+            position.play_unchecked(mov);
+
             self.node_count += 1;
 
             let mut score = -MATE_SCORE;
@@ -241,7 +265,8 @@ impl Negamax {
             }
 
             if score >= beta {
-                if mov.capture().is_none() {
+                // store quiet moves
+                if !mov.is_capture() {
                     let from = match mov.from() {
                         Some(v) => v,
                         None => break,
@@ -250,6 +275,7 @@ impl Negamax {
                     let turn = position.turn() as usize;
 
                     self.history_table[turn][from][to] += (depth * depth) as i32;
+                    self.store_killer_move(ply, mov);
                 }
 
                 break;
@@ -315,7 +341,9 @@ impl Negamax {
         self.sort_captures(&mut captures);
 
         for capture in captures {
-            let position = position.clone().play(capture).unwrap();
+            let mut position = position.clone();
+            position.play_unchecked(capture);
+
             let score = -self.quiescence(&position, &mut -beta, -*alpha);
             self.node_count += 1;
 
@@ -333,43 +361,47 @@ impl Negamax {
         best_value
     }
 
-    fn get_sorted_moves(&self, position: &Chess, hash_move: &Option<Move>) -> MoveList {
-        let mut move_list = position.legal_moves();
+    fn get_sorted_moves(&self, position: &Chess, ply: usize, hash_move: &Option<Move>) -> MoveList {
+        let move_list = position.legal_moves();
         let turn = position.turn() as usize;
+        let killers = self.killer_move_table[ply];
 
-        move_list.sort_by_key(|m| {
-            if let Some(hash_move) = hash_move
-                && m == hash_move
-            {
-                return -9999999; // hash moves always first
-            }
+        let mut scored: Vec<(i32, Move)> = move_list
+            .into_iter()
+            .map(|m| {
+                let score = if Some(m) == *hash_move {
+                    2_000_000_000 // Hash move is highest priority
+                } else if let Some(victim) = m.capture() {
+                    1_000_000_000 + super::eval::MVV_LVA[victim as usize - 1][m.role() as usize - 1]
+                } else if killers.contains_move(m) {
+                    1_000_000_000 // Same value as MVV-LVA so it's above bad captures but below good ones
+                } else {
+                    // History moves
+                    self.history_table[turn][m.from().unwrap() as usize][m.to() as usize]
+                };
+                (score, m)
+            })
+            .collect();
 
-            // if the move is a capture then sort it based on the MMV-LVA table
-            if let Some(victim) = m.capture() {
-                // +50000 so it's ahead of the normal moves
-                return -(super::eval::MMV_LVA[victim as usize - 1][m.role() as usize - 1] + 50000);
-            };
-
-            // otherwise sort it based on the history table
-            let from = match m.from() {
-                Some(v) => v,
-                None => return 0,
-            } as usize;
-            let to = m.to() as usize;
-            -self.history_table[turn][from][to]
-        });
-
-        move_list
+        // sort the scores
+        scored.sort_unstable_by_key(|&(s, _)| -s);
+        scored.into_iter().map(|(_, m)| m).collect()
     }
 
     fn sort_captures(&self, moves: &mut MoveList) {
         moves.sort_by_key(|m| {
             if let Some(victim) = m.capture() {
-                -super::eval::MMV_LVA[victim as usize - 1][m.role() as usize - 1]
+                -super::eval::MVV_LVA[victim as usize - 1][m.role() as usize - 1]
             } else {
                 100000 // aka show all normal moves last
             }
         });
+    }
+
+    fn store_killer_move(&mut self, ply: usize, m: Move) {
+        if !self.killer_move_table[ply].contains_move(m) {
+            self.killer_move_table[ply].insert_move(m);
+        }
     }
 
     pub fn hashfull(&self) -> usize {

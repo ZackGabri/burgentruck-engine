@@ -3,6 +3,7 @@ use std::time::Instant;
 use shakmaty::Chess;
 use shakmaty::fen::Fen;
 
+use crate::engine_options;
 use crate::search::SearchOptions;
 
 const BENCH_POSITIONS: [&str; 50] = [
@@ -58,9 +59,16 @@ const BENCH_POSITIONS: [&str; 50] = [
     "2r2b2/5p2/5k2/p1r1pP2/P2pB3/1P3P2/K1P3R1/7R w - - 23 93",
 ];
 
-const BENCH_DEPTH: usize = 5;
+const BENCH_DEPTH: usize = 6;
+const BENCH_HASH: usize = 8;
 
 pub fn bench() -> anyhow::Result<()> {
+    let hash_before_starting = engine_options().get_number("Hash");
+
+    engine_options()
+        .set("Hash", &BENCH_HASH.to_string())
+        .unwrap();
+
     let mut total_nodes = 0;
     let bench_start = Instant::now();
 
@@ -88,10 +96,16 @@ pub fn bench() -> anyhow::Result<()> {
             duration.as_millis()
         );
     }
+
     let bench_duration = bench_start.elapsed().as_millis();
     let nps = total_nodes * 1000 / bench_duration as usize;
     println!("--------------------------------");
     println!("Total bench duration: {bench_duration}ms");
     println!("{total_nodes} nodes {nps} nps");
+
+    engine_options()
+        .set("Hash", &hash_before_starting.to_string())
+        .unwrap();
+
     Ok(())
 }
