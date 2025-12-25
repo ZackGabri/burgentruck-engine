@@ -1,4 +1,4 @@
-use crate::{history::MoveHistory, search::negamax::PVariation};
+use crate::{history::MoveHistory, search::negamax::PVariation, transposition_table};
 use negamax::Negamax;
 
 use shakmaty::{Chess, Color, Move, Position};
@@ -21,7 +21,7 @@ fn print_info(
 ) {
     let Negamax { node_count, .. } = negamax;
 
-    let hashfull = negamax.hashfull();
+    let hashfull = transposition_table::hashfull();
     let nps = (*node_count as f64 / duration.as_secs_f64()) as usize;
     let time_ms = duration.as_millis();
 

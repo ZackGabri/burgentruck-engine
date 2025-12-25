@@ -58,7 +58,7 @@ const BENCH_POSITIONS: [&str; 50] = [
 ];
 
 const BENCH_DEPTH: usize = 6;
-const BENCH_HASH: usize = 8;
+const BENCH_HASH: usize = 128;
 
 pub fn bench() -> anyhow::Result<()> {
     let hash_before_starting = engine_options().get_number("Hash");

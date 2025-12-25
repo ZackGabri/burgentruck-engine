@@ -2,6 +2,8 @@ use std::collections::HashMap;
 use std::ops::RangeInclusive;
 use std::sync::{OnceLock, RwLock};
 
+use crate::transposition_table;
+
 pub fn default_options_list() -> &'static Vec<EngineOption<'static>> {
     static DEFAULTS: OnceLock<Vec<EngineOption>> = OnceLock::new();
 
@@ -9,6 +11,7 @@ pub fn default_options_list() -> &'static Vec<EngineOption<'static>> {
         vec![
             // Hash table size in megabytes
             EngineOption::new("Hash", OptionType::Spin(1..=2048, 128)),
+            EngineOption::new("Clear Hash", OptionType::Button(transposition_table::clear)),
             // The default depth the engine will search to
             EngineOption::new("Default Depth", OptionType::Spin(1..=64, 7)),
             EngineOption::new("Threads", OptionType::Spin(1..=1, 1)),
@@ -41,7 +44,7 @@ impl EngineOptions {
             println!(
                 "option name {name} type {data} {}",
                 match data {
-                    OptionType::Button => "".into(),
+                    OptionType::Button(_) => "".into(),
                     OptionType::Check(check) => format!("default {check}",),
                     OptionType::String(string) => format!("default {string}",),
                     OptionType::Combo(items, val) => {
@@ -93,7 +96,10 @@ impl EngineOptions {
                         OptionType::Spin(range.clone(), val)
                     }
                 }
-                OptionType::Button => OptionType::Button,
+                OptionType::Button(f) => {
+                    f();
+                    OptionType::Button(*f)
+                }
             },
         );
 
@@ -163,7 +169,7 @@ impl<'a> EngineOption<'a> {
 #[allow(unused)]
 #[derive(Debug, Clone)]
 pub enum OptionType {
-    Button,
+    Button(fn() -> ()),
     Check(bool),
     String(String),
     Combo(Vec<String>, String),
@@ -176,7 +182,7 @@ impl std::fmt::Display for OptionType {
             f,
             "{}",
             match self {
-                OptionType::Button => "button",
+                OptionType::Button(_) => "button",
                 OptionType::Check(_) => "check",
                 OptionType::String(_) => "string",
                 OptionType::Combo(_, _) => "combo",

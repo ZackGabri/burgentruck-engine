@@ -3,10 +3,9 @@ use rand::rngs::SmallRng;
 use shakmaty::zobrist::ZobristHash;
 use shakmaty::{Chess, Move, MoveList, Position};
 
-use crate::engine_options;
 use crate::history::MoveHistory;
 use crate::search::{MATE_SCORE, MAX_PLY};
-use crate::transposition_table::{TTBound, TTEntry, get_ttindex};
+use crate::transposition_table::{self, TTBound, TTEntry};
 
 pub struct PVariation {
     pub length: usize,
@@ -65,10 +64,6 @@ impl KillerMoves {
 // struct for shared data between every negamax call
 pub struct Negamax {
     pub node_count: usize,
-    transposition_table: Box<[TTEntry]>,
-    ttable_length: usize,
-    ttable_entries: usize,
-
     history_table: [[[i32; 64]; 64]; 2],
     killer_move_table: [KillerMoves; MAX_PLY],
 
@@ -78,19 +73,8 @@ pub struct Negamax {
 
 impl Negamax {
     pub fn new() -> Self {
-        // convert from megabytes to bytes
-        let desired_size = engine_options().get_number("Hash") * 1024 * 1024;
-        let tt_entry_size = size_of::<TTEntry>();
-
-        // calculate how many entries will fit in that memory size
-        let table_length = desired_size / tt_entry_size;
-
         Self {
             node_count: 0,
-            transposition_table: vec![TTEntry::default(); table_length].into_boxed_slice(),
-            ttable_length: table_length,
-            ttable_entries: 0,
-
             history_table: [[[0; 64]; 64]; 2],
             killer_move_table: [KillerMoves::default(); MAX_PLY],
 
@@ -137,21 +121,29 @@ impl Negamax {
         let is_check = position.is_check();
         let is_root = ply == 0;
 
-        let tt_index = get_ttindex(hash, self.ttable_length);
-        let tt_entry = self.transposition_table[tt_index];
+        let tt_entry = transposition_table::get(hash);
         let replace_tt = tt_entry.depth < depth || tt_entry.hash != hash;
 
+        pv.length = 0; // ensure fresh pv
         // tt probing and cutoffs
         if tt_entry.depth >= depth && tt_entry.hash == hash {
             match tt_entry.bound {
-                TTBound::Exact => return tt_entry.score,
+                TTBound::Exact => {
+                    pv.line[pv.length] = tt_entry.best_move;
+                    pv.length += 1;
+                    return tt_entry.score;
+                }
                 TTBound::Lower => {
                     if tt_entry.score >= beta {
+                        pv.line[pv.length] = tt_entry.best_move;
+                        pv.length += 1;
                         return tt_entry.score;
                     }
                 }
                 TTBound::Upper => {
                     if tt_entry.score < alpha {
+                        pv.line[pv.length] = tt_entry.best_move;
+                        pv.length += 1;
                         return tt_entry.score;
                     }
                 }
@@ -209,7 +201,6 @@ impl Negamax {
             }
         }
 
-        pv.length = 0;
         let mut best_move = None;
         for (move_index, mov) in moves.into_iter().enumerate() {
             if depth > 1 && self.is_out_of_time() {
@@ -288,10 +279,6 @@ impl Negamax {
         }
 
         if replace_tt {
-            if tt_entry.hash == 0.into() {
-                self.ttable_entries += 1;
-            }
-
             let bound = if max <= original_alpha {
                 TTBound::Upper
             } else if max >= beta {
@@ -300,13 +287,16 @@ impl Negamax {
                 TTBound::Exact
             };
 
-            self.transposition_table[tt_index] = TTEntry {
+            transposition_table::put(
                 hash,
-                depth,
-                bound,
-                best_move,
-                score: max,
-            };
+                TTEntry {
+                    hash,
+                    depth,
+                    bound,
+                    best_move,
+                    score: max,
+                },
+            );
         }
 
         max
@@ -407,9 +397,5 @@ impl Negamax {
         if !self.killer_move_table[ply].contains_move(m) {
             self.killer_move_table[ply].insert_move(m);
         }
-    }
-
-    pub fn hashfull(&self) -> usize {
-        (self.ttable_entries * 1000) / self.ttable_length
     }
 }

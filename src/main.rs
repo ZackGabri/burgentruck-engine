@@ -60,15 +60,20 @@ fn main() -> Result<(), anyhow::Error> {
                     let name = split.next().unwrap_or(&[""]).join(" ");
                     let value = split.next().unwrap_or(&[""]).join(" ");
 
-                    let result = engine_options().set(name, value);
+                    let result = engine_options().set(&name, &value);
                     if let Err(err) = result {
                         println!("{err:?}")
                     }
+
+                    if &name == "Hash" {
+                        transposition_table::resize();
+                    }
                 };
             }
-
+            ["ucinewgame", ..] => {
+                transposition_table::clear();
+            }
             ["isready", ..] => println!("readyok"),
-            ["ucinewgame", ..] => {}
 
             ["position"] => {}
             ["position", pos_type, args @ ..] => match *pos_type {
