@@ -127,7 +127,10 @@ impl Negamax {
 
         // threefold detection
         let count = history.count_item(&hash);
-        if count >= 2 && ply > 0 || position.is_insufficient_material() {
+        if count >= 2 && ply > 0
+            || position.is_insufficient_material()
+            || position.halfmoves() >= 100
+        {
             return 0;
         }
 

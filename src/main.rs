@@ -154,7 +154,7 @@ fn main() -> Result<(), anyhow::Error> {
                     deadline: time.into_deadline(
                         start_time,
                         pos.turn(),
-                        (history.index + 1) as u64,
+                        pos.fullmoves().get() as u64,
                     ),
                     max_depth,
                     max_nodes,
