@@ -115,7 +115,7 @@ impl Negamax {
             return self.quiescence(position, &mut alpha, beta);
         }
 
-        if self.is_out_of_time() {
+        if depth > 1 && self.is_out_of_time() {
             return -alpha;
         }
 
@@ -209,6 +209,10 @@ impl Negamax {
         pv.length = 0;
         let mut best_move = None;
         for (move_index, mov) in moves.into_iter().enumerate() {
+            if depth > 1 && self.is_out_of_time() {
+                return alpha;
+            }
+
             let mut position = position.clone();
             position.play_unchecked(mov);
 

@@ -81,7 +81,7 @@ pub fn search(
 
     let mut pv = PVariation::default();
     for depth in 1..=max_depth {
-        if negamax.is_out_of_time() {
+        if negamax.is_out_of_time() && depth > 1 {
             break;
         }
 
@@ -109,15 +109,11 @@ pub fn search(
         }
     }
 
-    // if negamax failed for whatever reason, then move would be the first move in the position
+    // if negamax failed for whatever reason, then just play the first move in the position
     if pv.line[0].is_none() {
-        let moves = position.legal_moves();
-        pv.line[0] = Some(moves[0]);
-        println!(
-            "info depth 69 score cp -99999 nodes {} nps {} hashfull -1 time -1 pv e2e1",
-            deadline.unwrap().elapsed().as_millis(),
-            start.elapsed().as_millis(),
-        );
+        pv.line[0] = position.legal_moves().first().copied();
+        // just print invalid pv so engines can warn or smth
+        println!("info depth 0 score cp 0 nodes 0 nps 0 hashfull -1 time -1 pv e2e2 e2e1 e1e2");
     }
 
     (pv.line[0], negamax.node_count)
