@@ -1,3 +1,5 @@
+use std::sync::OnceLock;
+
 use rand::SeedableRng;
 use rand::rngs::SmallRng;
 use shakmaty::zobrist::ZobristHash;
@@ -59,6 +61,30 @@ impl KillerMoves {
     fn contains_move(&self, m: Move) -> bool {
         self.moves[0] == Some(m) || self.moves[1] == Some(m)
     }
+}
+
+pub const MAX_PSUEDO_MOVES: usize = 280;
+
+// Late Move Reductions table
+static LMR_TABLE: OnceLock<[[usize; MAX_PSUEDO_MOVES]; MAX_PLY]> = OnceLock::new();
+fn get_lmr_table() -> &'static [[usize; MAX_PSUEDO_MOVES]; MAX_PLY] {
+    LMR_TABLE.get_or_init(|| {
+        let mut table = [[0; MAX_PSUEDO_MOVES]; MAX_PLY];
+
+        let mut depth = 1;
+        while depth < MAX_PLY {
+            let mut move_num = 1;
+            while move_num < MAX_PSUEDO_MOVES {
+                table[depth][move_num] =
+                    (0.25 + (depth as f64).ln() * (move_num as f64).ln() / 3.25) as usize;
+
+                move_num += 1;
+            }
+            depth += 1;
+        }
+
+        table
+    })
 }
 
 // struct for shared data between every negamax call
@@ -218,30 +244,55 @@ impl Negamax {
             let mut score = -MATE_SCORE;
             let mut child_pv = PVariation::default();
 
-            let depth_reduction = 1;
-            let depth = depth.saturating_sub(depth_reduction);
+            let is_quiet = !mov.is_capture() && !mov.is_promotion();
 
             // Principal variation search (PVS)
             // If we are in a non-PV node, OR we are in a PV-node examining moves after the 1st legal move
             if !pv_node || move_index > 0 {
+                let lmr_conditions = !is_check
+                    && depth >= 3
+                    && move_index >= 3
+                    && is_quiet
+                    && !self.killer_move_table[ply].contains_move(mov);
+
+                let lmr_reduction = if lmr_conditions {
+                    get_lmr_table()[depth][move_index]
+                } else {
+                    0
+                };
+
                 // Perform zero-window search (ZWS) on non-PV nodes
                 score = -self.negamax(
                     &position,
                     &history.clone(),
-                    depth,
+                    depth - lmr_reduction - 1,
                     ply + 1,
                     -alpha - 1,
                     -alpha,
                     &mut child_pv,
                     false,
                 );
+
+                // if LMR fails high then do a full search instead
+                if lmr_reduction > 0 && score > alpha {
+                    score = -self.negamax(
+                        &position,
+                        &history.clone(),
+                        depth - 1,
+                        ply + 1,
+                        -alpha - 1,
+                        -alpha,
+                        &mut child_pv,
+                        false,
+                    );
+                }
             }
             // We are in a PV node and either it's the first legal move, OR the ZWS failed high
             if pv_node && (move_index == 0 || score > alpha) {
                 score = -self.negamax(
                     &position,
                     &history.clone(),
-                    depth,
+                    depth - 1,
                     ply + 1,
                     -beta,
                     -alpha,
@@ -265,7 +316,7 @@ impl Negamax {
 
             if score >= beta {
                 // store quiet moves
-                if !mov.is_capture() {
+                if is_quiet {
                     let from = match mov.from() {
                         Some(v) => v,
                         None => break,
