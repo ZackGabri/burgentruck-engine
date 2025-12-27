@@ -84,6 +84,8 @@ pub fn search(
     // let mut alpha_window = 50;
     let mut beta = MATE_SCORE;
     // let mut beta_window = 50;
+    let window_size = 50;
+    let mut delta = window_size;
 
     let mut depth = 1;
 
@@ -95,23 +97,27 @@ pub fn search(
 
         let score = negamax.negamax(position, history, depth, 0, alpha, beta, &mut pv, true);
 
-        /*
         if depth > 3 {
             if score <= alpha {
-                alpha -= alpha_window;
-                alpha_window *= 2;
+                // alpha -= alpha_window;
+                // alpha_window *= 2;
+                beta = (alpha + beta) / 2;
+                alpha = std::cmp::max(-MATE_SCORE, alpha - delta);
+                delta += delta / 2;
                 continue;
             }
             if score >= beta {
-                beta += beta_window;
-                beta_window *= 2;
+                // beta += beta_window;
+                // beta_window *= 2;
+                beta = std::cmp::min(MATE_SCORE, beta + delta);
+                delta += delta / 2;
                 continue;
             }
 
-            alpha = score - alpha_window;
-            beta = score + beta_window;
+            delta = window_size;
+            alpha = std::cmp::max(-MATE_SCORE, score - delta);
+            beta = std::cmp::min(score + delta, MATE_SCORE);
         }
-        */
 
         if !bench {
             let duration = start.elapsed();
