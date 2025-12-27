@@ -76,7 +76,7 @@ fn get_lmr_table() -> &'static [[usize; MAX_PSUEDO_MOVES]; MAX_PLY] {
             let mut move_num = 1;
             while move_num < MAX_PSUEDO_MOVES {
                 table[depth][move_num] =
-                    (0.25 + (depth as f64).ln() * (move_num as f64).ln() / 3.25) as usize;
+                    (0.50 + (depth as f64).ln() * (move_num as f64).ln() / 3.00) as usize;
 
                 move_num += 1;
             }
@@ -231,7 +231,7 @@ impl Negamax {
         }
 
         let mut best_move = None;
-        for (move_index, mov) in moves.into_iter().enumerate() {
+        for (move_index, (_, mov)) in moves.into_iter().enumerate() {
             if depth > 1 && self.is_out_of_time() {
                 return alpha;
             }
@@ -410,31 +410,35 @@ impl Negamax {
         best_value
     }
 
-    fn get_sorted_moves(&self, position: &Chess, ply: usize, hash_move: &Option<Move>) -> MoveList {
+    fn get_sorted_moves(
+        &self,
+        position: &Chess,
+        ply: usize,
+        hash_move: &Option<Move>,
+    ) -> Vec<(i32, Move)> {
         let move_list = position.legal_moves();
         let turn = position.turn() as usize;
         let killers = self.killer_move_table[ply];
 
-        let mut scored: Vec<(i32, Move)> = move_list
-            .into_iter()
-            .map(|m| {
-                let score = if Some(m) == *hash_move {
-                    2_000_000_000 // Hash move is highest priority
-                } else if let Some(victim) = m.capture() {
-                    1_000_000_000 + super::eval::MVV_LVA[victim as usize - 1][m.role() as usize - 1]
-                } else if killers.contains_move(m) {
-                    1_000_000_000 // Same value as MVV-LVA so it's above bad captures but below good ones
-                } else {
-                    // History moves
-                    self.history_table[turn][m.from().unwrap() as usize][m.to() as usize]
-                };
-                (score, m)
-            })
-            .collect();
+        let mut scored: Vec<(i32, Move)> = Vec::with_capacity(move_list.len());
+        for m in move_list {
+            let score = if Some(m) == *hash_move {
+                2_000_000_000 // Hash move is highest priority
+            } else if let Some(victim) = m.capture() {
+                1_000_000_000 + super::eval::MVV_LVA[victim as usize - 1][m.role() as usize - 1]
+            } else if killers.contains_move(m) {
+                1_000_000_000 // Same value as MVV-LVA so it's above bad captures but below good ones
+            } else {
+                // History moves
+                self.history_table[turn][m.from().unwrap() as usize][m.to() as usize]
+            };
+
+            scored.push((score, m));
+        }
 
         // sort the scores
         scored.sort_unstable_by_key(|&(s, _)| -s);
-        scored.into_iter().map(|(_, m)| m).collect()
+        scored
     }
 
     fn sort_captures(&self, moves: &mut MoveList) {
