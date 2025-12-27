@@ -79,22 +79,37 @@ pub fn search(
 
     let start = minstant::Instant::now();
 
+    // aspiration window variables
+    let mut alpha = -MATE_SCORE;
+    let mut alpha_window = 50;
+    let mut beta = MATE_SCORE;
+    let mut beta_window = 50;
+
+    let mut depth = 1;
+
     let mut pv = PVariation::default();
-    for depth in 1..=max_depth {
+    while depth <= max_depth {
         if negamax.is_out_of_time() && depth > 1 {
             break;
         }
 
-        let score = negamax.negamax(
-            position,
-            history,
-            depth,
-            0,
-            -MATE_SCORE,
-            MATE_SCORE,
-            &mut pv,
-            true,
-        );
+        let score = negamax.negamax(position, history, depth, 0, alpha, beta, &mut pv, true);
+
+        if depth > 3 {
+            if score <= alpha {
+                alpha -= alpha_window;
+                alpha_window *= 2;
+                continue;
+            }
+            if score >= beta {
+                beta += beta_window;
+                beta_window *= 2;
+                continue;
+            }
+
+            alpha = score - alpha_window;
+            beta = score + beta_window;
+        }
 
         if !bench {
             let duration = start.elapsed();
@@ -107,6 +122,8 @@ pub fn search(
         if max_nodes > 0 && negamax.node_count >= max_nodes {
             break;
         }
+
+        depth += 1;
     }
 
     // if negamax failed for whatever reason, then just play the first move in the position
