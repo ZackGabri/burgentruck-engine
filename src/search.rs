@@ -81,9 +81,9 @@ pub fn search(
 
     // aspiration window variables
     let mut alpha = -MATE_SCORE;
-    let mut alpha_window = 50;
+    // let mut alpha_window = 50;
     let mut beta = MATE_SCORE;
-    let mut beta_window = 50;
+    // let mut beta_window = 50;
 
     let mut depth = 1;
 
@@ -95,6 +95,7 @@ pub fn search(
 
         let score = negamax.negamax(position, history, depth, 0, alpha, beta, &mut pv, true);
 
+        /*
         if depth > 3 {
             if score <= alpha {
                 alpha -= alpha_window;
@@ -110,6 +111,7 @@ pub fn search(
             alpha = score - alpha_window;
             beta = score + beta_window;
         }
+        */
 
         if !bench {
             let duration = start.elapsed();
