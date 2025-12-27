@@ -1,3 +1,5 @@
+use std::sync::OnceLock;
+
 use rand::SeedableRng;
 use rand::rngs::SmallRng;
 use shakmaty::zobrist::ZobristHash;
@@ -61,13 +63,39 @@ impl KillerMoves {
     }
 }
 
+pub const MAX_PSUEDO_MOVES: usize = 280;
+
+// Late Move Reductions table
+static LMR_TABLE: OnceLock<[[usize; MAX_PSUEDO_MOVES]; MAX_PLY]> = OnceLock::new();
+fn get_lmr_table() -> &'static [[usize; MAX_PSUEDO_MOVES]; MAX_PLY] {
+    LMR_TABLE.get_or_init(|| {
+        let mut table = [[0; MAX_PSUEDO_MOVES]; MAX_PLY];
+
+        let mut depth = 1;
+        while depth < MAX_PLY {
+            let mut move_num = 1;
+            while move_num < MAX_PSUEDO_MOVES {
+                table[depth][move_num] =
+                    (0.50 + (depth as f64).ln() * (move_num as f64).ln() / 3.00) as usize;
+
+                move_num += 1;
+            }
+            depth += 1;
+        }
+
+        table
+    })
+}
+
 // struct for shared data between every negamax call
 pub struct Negamax {
     pub node_count: usize,
     history_table: [[[i32; 64]; 64]; 2],
     killer_move_table: [KillerMoves; MAX_PLY],
 
+    #[allow(unused)]
     rng: SmallRng,
+
     pub deadline: Option<minstant::Instant>, // deadline for the search to stop at
 }
 
@@ -79,6 +107,7 @@ impl Negamax {
             killer_move_table: [KillerMoves::default(); MAX_PLY],
 
             rng: SmallRng::from_seed([0; 32]),
+
             deadline: None,
         }
     }
@@ -202,7 +231,7 @@ impl Negamax {
         }
 
         let mut best_move = None;
-        for (move_index, mov) in moves.into_iter().enumerate() {
+        for (move_index, (_, mov)) in moves.into_iter().enumerate() {
             if depth > 1 && self.is_out_of_time() {
                 return alpha;
             }
@@ -215,30 +244,55 @@ impl Negamax {
             let mut score = -MATE_SCORE;
             let mut child_pv = PVariation::default();
 
-            let depth_reduction = 1;
-            let depth = depth.saturating_sub(depth_reduction);
+            let is_quiet = !mov.is_capture() && !mov.is_promotion();
 
             // Principal variation search (PVS)
             // If we are in a non-PV node, OR we are in a PV-node examining moves after the 1st legal move
             if !pv_node || move_index > 0 {
+                let lmr_conditions = !is_check
+                    && depth >= 3
+                    && move_index >= 3
+                    && is_quiet
+                    && !self.killer_move_table[ply].contains_move(mov);
+
+                let lmr_reduction = if lmr_conditions {
+                    get_lmr_table()[depth][move_index]
+                } else {
+                    0
+                };
+
                 // Perform zero-window search (ZWS) on non-PV nodes
                 score = -self.negamax(
                     &position,
                     &history.clone(),
-                    depth,
+                    depth - lmr_reduction - 1,
                     ply + 1,
                     -alpha - 1,
                     -alpha,
                     &mut child_pv,
                     false,
                 );
+
+                // if LMR fails high then do a full search instead
+                if lmr_reduction > 0 && score > alpha {
+                    score = -self.negamax(
+                        &position,
+                        &history.clone(),
+                        depth - 1,
+                        ply + 1,
+                        -alpha - 1,
+                        -alpha,
+                        &mut child_pv,
+                        false,
+                    );
+                }
             }
             // We are in a PV node and either it's the first legal move, OR the ZWS failed high
             if pv_node && (move_index == 0 || score > alpha) {
                 score = -self.negamax(
                     &position,
                     &history.clone(),
-                    depth,
+                    depth - 1,
                     ply + 1,
                     -beta,
                     -alpha,
@@ -262,7 +316,7 @@ impl Negamax {
 
             if score >= beta {
                 // store quiet moves
-                if !mov.is_capture() {
+                if is_quiet {
                     let from = match mov.from() {
                         Some(v) => v,
                         None => break,
@@ -304,7 +358,7 @@ impl Negamax {
 
     #[inline(always)]
     fn static_eval(&mut self, position: &Chess) -> i32 {
-        super::eval::evaluate(position, &mut self.rng)
+        super::eval::evaluate(position)
     }
 
     pub fn is_out_of_time(&self) -> bool {
@@ -356,31 +410,35 @@ impl Negamax {
         best_value
     }
 
-    fn get_sorted_moves(&self, position: &Chess, ply: usize, hash_move: &Option<Move>) -> MoveList {
+    fn get_sorted_moves(
+        &self,
+        position: &Chess,
+        ply: usize,
+        hash_move: &Option<Move>,
+    ) -> Vec<(i32, Move)> {
         let move_list = position.legal_moves();
         let turn = position.turn() as usize;
         let killers = self.killer_move_table[ply];
 
-        let mut scored: Vec<(i32, Move)> = move_list
-            .into_iter()
-            .map(|m| {
-                let score = if Some(m) == *hash_move {
-                    2_000_000_000 // Hash move is highest priority
-                } else if let Some(victim) = m.capture() {
-                    1_000_000_000 + super::eval::MVV_LVA[victim as usize - 1][m.role() as usize - 1]
-                } else if killers.contains_move(m) {
-                    1_000_000_000 // Same value as MVV-LVA so it's above bad captures but below good ones
-                } else {
-                    // History moves
-                    self.history_table[turn][m.from().unwrap() as usize][m.to() as usize]
-                };
-                (score, m)
-            })
-            .collect();
+        let mut scored: Vec<(i32, Move)> = Vec::with_capacity(move_list.len());
+        for m in move_list {
+            let score = if Some(m) == *hash_move {
+                2_000_000_000 // Hash move is highest priority
+            } else if let Some(victim) = m.capture() {
+                1_000_000_000 + super::eval::MVV_LVA[victim as usize - 1][m.role() as usize - 1]
+            } else if killers.contains_move(m) {
+                1_000_000_000 // Same value as MVV-LVA so it's above bad captures but below good ones
+            } else {
+                // History moves
+                self.history_table[turn][m.from().unwrap() as usize][m.to() as usize]
+            };
+
+            scored.push((score, m));
+        }
 
         // sort the scores
         scored.sort_unstable_by_key(|&(s, _)| -s);
-        scored.into_iter().map(|(_, m)| m).collect()
+        scored
     }
 
     fn sort_captures(&self, moves: &mut MoveList) {
