@@ -236,11 +236,12 @@ impl Negamax {
                 return alpha;
             }
 
+            let is_mate = max.abs() >= crate::search::MATE_THRESHOLD;
             let is_quiet = !mov.is_capture() && !mov.is_promotion();
-
+            let is_killer = self.killer_move_table[ply].contains_move(mov);            
 
             // Move loop pruning
-            if !is_root && !pv_node && is_quiet {
+            if !is_root && !pv_node && !is_mate && !is_check && is_quiet && !is_killer {
                 // Late move pruning
                 if move_index >= 4 + 3 * depth * depth {
                     continue;
@@ -263,7 +264,7 @@ impl Negamax {
                     && depth >= 3
                     && move_index >= 3
                     && is_quiet
-                    && !self.killer_move_table[ply].contains_move(mov);
+                    && !is_killer;
 
                 let lmr_reduction = if lmr_conditions {
                     get_lmr_table()[depth][move_index]
