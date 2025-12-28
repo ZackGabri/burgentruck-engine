@@ -236,6 +236,17 @@ impl Negamax {
                 return alpha;
             }
 
+            let is_quiet = !mov.is_capture() && !mov.is_promotion();
+
+
+            // Move loop pruning
+            if !is_root && !pv_node && is_quiet {
+                // Late move pruning
+                if move_index >= 4 + 3 * depth * depth {
+                    continue;
+                }
+            }
+
             let mut position = position.clone();
             position.play_unchecked(mov);
 
@@ -244,8 +255,7 @@ impl Negamax {
             let mut score = -MATE_SCORE;
             let mut child_pv = PVariation::default();
 
-            let is_quiet = !mov.is_capture() && !mov.is_promotion();
-
+           
             // Principal variation search (PVS)
             // If we are in a non-PV node, OR we are in a PV-node examining moves after the 1st legal move
             if !pv_node || move_index > 0 {
