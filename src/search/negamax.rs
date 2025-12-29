@@ -243,7 +243,7 @@ impl Negamax {
             // Move loop pruning
             if !is_root && !pv_node && !is_mate && !is_check && is_quiet && !is_killer {
                 // Late move pruning
-                if move_index >= 4 + 3 * depth * depth {
+                if move_index >= 5 + 4 * depth * depth {
                     continue;
                 }
             }
@@ -260,6 +260,7 @@ impl Negamax {
             // Principal variation search (PVS)
             // If we are in a non-PV node, OR we are in a PV-node examining moves after the 1st legal move
             if !pv_node || move_index > 0 {
+                // Late Move Reductions (LMR)
                 let lmr_conditions = !is_check
                     && depth >= 3
                     && move_index >= 3
