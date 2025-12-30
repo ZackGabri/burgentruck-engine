@@ -248,6 +248,21 @@ impl Negamax {
                 return alpha;
             }
 
+            let is_quiet = !mov.is_capture() && !mov.is_promotion();
+
+            // Move loop pruning
+            if !is_root && !pv_node && is_quiet && max.abs() < crate::search::MATE_THRESHOLD {
+                // Futility pruning
+                if depth <= 3 && move_index >= 4 {
+                    let static_eval = self.static_eval(position);
+
+                    // Discard moves with no potential to raise alpha
+                    if static_eval + 300 * depth as i32 <= alpha {
+                        continue;
+                    }
+                }
+            }
+
             let mut position = position.clone();
             position.play_unchecked(mov);
 
@@ -255,8 +270,6 @@ impl Negamax {
 
             let mut score = -MATE_SCORE;
             let mut child_pv = PVariation::default();
-
-            let is_quiet = !mov.is_capture() && !mov.is_promotion();
 
             // Principal variation search (PVS)
             // If we are in a non-PV node, OR we are in a PV-node examining moves after the 1st legal move
