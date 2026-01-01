@@ -117,7 +117,7 @@ impl Negamax {
         &mut self,
         position: &Chess,
         history: &MoveHistory,
-        depth: usize,
+        mut depth: usize,
         ply: usize,
         mut alpha: i32,
         beta: i32,
@@ -151,7 +151,8 @@ impl Negamax {
         let is_root = ply == 0;
 
         let tt_entry = transposition_table::get(hash);
-        let replace_tt = tt_entry.depth < depth || tt_entry.hash != hash;
+        let tt_hit = tt_entry.hash == hash;
+        let replace_tt = tt_entry.depth < depth || !tt_hit;
 
         pv.length = 0; // ensure fresh pv
         // tt probing and cutoffs
@@ -215,6 +216,17 @@ impl Negamax {
                     }
                 }
             }
+        }
+
+        // Internal iterative reductions (IIR)
+        // If the position has not been searched yet (i.e. no hash move), we try searching with reduced
+        // depth to record a move that we can later re-use.
+        if depth >= 8 
+            && !is_check 
+            && pv_node
+            && (!tt_hit || tt_entry.depth <= depth - 5)
+        {
+            depth -= 1;
         }
 
         let mut max = -MATE_SCORE;

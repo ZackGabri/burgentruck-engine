@@ -57,7 +57,7 @@ const BENCH_POSITIONS: [&str; 50] = [
     "2r2b2/5p2/5k2/p1r1pP2/P2pB3/1P3P2/K1P3R1/7R w - - 23 93",
 ];
 
-const BENCH_DEPTH: usize = 6;
+const BENCH_DEPTH: usize = 8;
 const BENCH_HASH: usize = 128;
 
 pub fn bench() -> anyhow::Result<()> {
