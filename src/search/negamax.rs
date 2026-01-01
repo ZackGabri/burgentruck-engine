@@ -221,7 +221,7 @@ impl Negamax {
         // Internal iterative reductions (IIR)
         // If the position has not been searched yet (i.e. no hash move), we try searching with reduced
         // depth to record a move that we can later re-use.
-        if depth >= 8 
+        if depth >= 6 
             && !is_check 
             && pv_node
             && (!tt_hit || tt_entry.depth <= depth - 5)
