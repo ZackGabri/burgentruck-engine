@@ -180,10 +180,16 @@ impl Negamax {
             }
         }
 
+        let mut static_eval = None;
+
         // whole node pruning
         if !is_check && !is_root {
             // reverse futility pruning
-            let static_eval = self.static_eval(position);
+            if static_eval.is_none() {
+                static_eval = Some(self.static_eval(position));
+            }
+            let static_eval = static_eval.unwrap();
+
             let margin = 80 * depth;
 
             if depth <= 4 && static_eval >= beta + margin as i32 {
@@ -253,8 +259,11 @@ impl Negamax {
             // Move loop pruning
             if !is_root && !pv_node && is_quiet && max.abs() < crate::search::MATE_THRESHOLD {
                 // Futility pruning
-                if depth <= 3 && move_index >= 4 {
-                    let static_eval = self.static_eval(position);
+                if depth <= 3 && move_index >= 8 {
+                    if static_eval.is_none() {
+                        static_eval = Some(self.static_eval(position));
+                    }
+                    let static_eval = static_eval.unwrap();
 
                     // Discard moves with no potential to raise alpha
                     if static_eval + 300 * depth as i32 <= alpha {
