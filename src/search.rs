@@ -85,7 +85,7 @@ pub fn search(
     let mut beta = MATE_SCORE;
     // let mut beta_window = 50;
     let window_size = 50;
-    let mut delta = window_size;
+    // let mut delta = window_size;
 
     let mut depth = 1;
 
@@ -97,6 +97,8 @@ pub fn search(
 
         let score = negamax.negamax(position, history, depth, 0, alpha, beta, &mut pv, true);
 
+        /*
+        // Aspiration windows
         if depth > 3 {
             if score <= alpha {
                 // alpha -= alpha_window;
@@ -118,6 +120,7 @@ pub fn search(
             alpha = std::cmp::max(-MATE_SCORE, score - delta);
             beta = std::cmp::min(score + delta, MATE_SCORE);
         }
+        */
 
         if !bench {
             let duration = start.elapsed();
