@@ -180,10 +180,16 @@ impl Negamax {
             }
         }
 
+        let mut static_eval = None;
+
         // whole node pruning
         if !is_check && !is_root {
             // reverse futility pruning
-            let static_eval = self.static_eval(position);
+            if static_eval.is_none() {
+                static_eval = Some(self.static_eval(position));
+            }
+            let static_eval = static_eval.unwrap();
+
             let margin = 80 * depth;
 
             if depth <= 4 && static_eval >= beta + margin as i32 {
@@ -248,6 +254,24 @@ impl Negamax {
                 return alpha;
             }
 
+            let is_quiet = !mov.is_capture() && !mov.is_promotion();
+
+            // Move loop pruning
+            if !is_root && !pv_node && is_quiet && max.abs() < crate::search::MATE_THRESHOLD {
+                // Futility pruning
+                if depth <= 3 && move_index >= 4 {
+                    if static_eval.is_none() {
+                        static_eval = Some(self.static_eval(position));
+                    }
+                    let static_eval = static_eval.unwrap();
+
+                    // Discard moves with no potential to raise alpha
+                    if static_eval + 200 * depth as i32 <= alpha {
+                        continue;
+                    }
+                }
+            }
+
             let mut position = position.clone();
             position.play_unchecked(mov);
 
@@ -255,8 +279,6 @@ impl Negamax {
 
             let mut score = -MATE_SCORE;
             let mut child_pv = PVariation::default();
-
-            let is_quiet = !mov.is_capture() && !mov.is_promotion();
 
             // Principal variation search (PVS)
             // If we are in a non-PV node, OR we are in a PV-node examining moves after the 1st legal move
