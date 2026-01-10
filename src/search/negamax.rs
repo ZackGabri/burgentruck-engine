@@ -185,15 +185,12 @@ impl Negamax {
         // whole node pruning
         if !is_check && !is_root {
             // reverse futility pruning
-            if static_eval.is_none() {
-                static_eval = Some(self.static_eval(position));
-            }
-            let static_eval = static_eval.unwrap();
+            let static_eval = static_eval.get_or_insert(self.static_eval(position));
 
             let margin = 80 * depth;
 
-            if depth <= 4 && static_eval >= beta + margin as i32 {
-                return static_eval;
+            if depth <= 4 && *static_eval >= beta + margin as i32 {
+                return *static_eval;
             }
 
             // null move pruning
@@ -227,11 +224,7 @@ impl Negamax {
         // Internal iterative reductions (IIR)
         // If the position has not been searched yet (i.e. no hash move), we try searching with reduced
         // depth to record a move that we can later re-use.
-        if depth >= 6 
-            && !is_check 
-            && pv_node
-            && (!tt_hit || tt_entry.depth <= depth - 5)
-        {
+        if depth >= 6 && !is_check && pv_node && (!tt_hit || tt_entry.depth <= depth - 5) {
             depth -= 1;
         }
 
@@ -260,13 +253,10 @@ impl Negamax {
             if !is_root && !pv_node && is_quiet && max.abs() < crate::search::MATE_THRESHOLD {
                 // Futility pruning
                 if depth <= 3 && move_index >= 4 {
-                    if static_eval.is_none() {
-                        static_eval = Some(self.static_eval(position));
-                    }
-                    let static_eval = static_eval.unwrap();
+                    let static_eval = static_eval.get_or_insert(self.static_eval(position));
 
                     // Discard moves with no potential to raise alpha
-                    if static_eval + 200 * depth as i32 <= alpha {
+                    if *static_eval + 200 * depth as i32 <= alpha {
                         continue;
                     }
                 }
