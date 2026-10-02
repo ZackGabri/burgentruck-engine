@@ -84,10 +84,13 @@ pub fn search(
     // let mut alpha_window = 50;
     let mut beta = MATE_SCORE;
     // let mut beta_window = 50;
-    let window_size = 50;
-    // let mut delta = window_size;
+    let window_size = 33;
+    let mut delta = window_size;
 
     let mut depth = 1;
+
+    // let mut fail_low = 0;
+    // let mut fail_high = 0;
 
     let mut pv = PVariation::default();
     while depth <= max_depth {
@@ -95,47 +98,61 @@ pub fn search(
             break;
         }
 
-        let score = negamax.negamax(position, history, depth, 0, alpha, beta, &mut pv, true);
+        let mut iter_pv = PVariation::default(); // don't reuse pv from previous iteration, since it 
+                                             // may be invalid if the search fails
+        // println!("depth {depth} alpha {alpha} beta {beta} window {window_size} delta {delta}");
+        let score = negamax.negamax(position, history, depth, 0, alpha, beta, &mut iter_pv, true);
 
-        /*
+        if negamax.is_out_of_time() {
+            break;
+        }
+
+        let node_limit_hit = max_nodes > 0 && negamax.node_count >= max_nodes;
+
         // Aspiration windows
-        if depth > 3 {
+        if depth > 4 {
             if score <= alpha {
-                // alpha -= alpha_window;
-                // alpha_window *= 2;
+                if node_limit_hit {
+                    break;
+                }
                 beta = (alpha + beta) / 2;
                 alpha = std::cmp::max(-MATE_SCORE, alpha - delta);
                 delta += delta / 2;
+                // fail_low += 1;
                 continue;
             }
             if score >= beta {
-                // beta += beta_window;
-                // beta_window *= 2;
+                pv = iter_pv; // fail high still has vaild best move
+                if node_limit_hit {
+                    break;
+                }
                 beta = std::cmp::min(MATE_SCORE, beta + delta);
                 delta += delta / 2;
+                // fail_high += 1;
                 continue;
             }
 
+            // Reset parameters if search passes
             delta = window_size;
-            alpha = std::cmp::max(-MATE_SCORE, score - delta);
-            beta = std::cmp::min(score + delta, MATE_SCORE);
+            alpha = std::cmp::max(-MATE_SCORE, score - window_size);
+            beta = std::cmp::min(score + window_size, MATE_SCORE);
         }
-        */
+
+        pv = iter_pv; // search passes, so we can update the pv
 
         if !bench {
             let duration = start.elapsed();
             print_info(depth, score, duration, &negamax, &pv);
         }
 
-        if negamax.is_out_of_time() {
-            break;
-        }
-        if max_nodes > 0 && negamax.node_count >= max_nodes {
+        if negamax.is_out_of_time() || node_limit_hit {
             break;
         }
 
         depth += 1;
     }
+
+    // println!("Fail lows: {fail_low}, fail highs: {fail_high}");
 
     // if negamax failed for whatever reason, then just play the first move in the position
     if pv.line[0].is_none() {
