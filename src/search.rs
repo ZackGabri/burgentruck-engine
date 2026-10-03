@@ -4,8 +4,14 @@ use negamax::Negamax;
 use shakmaty::{Chess, Color, Move, Position};
 use std::time::Duration;
 
+use std::sync::atomic::{AtomicUsize, Ordering};
+
 pub mod eval;
 pub mod negamax;
+
+pub static FAIL_LOWS: AtomicUsize = AtomicUsize::new(0);
+pub static FAIL_HIGHS: AtomicUsize = AtomicUsize::new(0);
+pub static ASP_ITERS: AtomicUsize = AtomicUsize::new(0);
 
 pub const MATE_SCORE: i32 = 100_000;
 pub const MATE_THRESHOLD: i32 = MATE_SCORE - 1000;
@@ -81,11 +87,9 @@ pub fn search(
 
     // aspiration window variables
     let mut alpha = -MATE_SCORE;
-    // let mut alpha_window = 50;
     let mut beta = MATE_SCORE;
-    // let mut beta_window = 50;
-    let window_size = 50;
-    // let mut delta = window_size;
+    const WINDOW_SIZE: i32 = 18;
+    let mut delta = WINDOW_SIZE;
 
     let mut depth = 1;
 
@@ -95,42 +99,54 @@ pub fn search(
             break;
         }
 
-        let score = negamax.negamax(position, history, depth, 0, alpha, beta, &mut pv, true);
+        let mut iter_pv = PVariation::default(); // don't reuse pv from previous iteration, since it 
+                                                 // may be invalid if the search fails
+        let score = negamax.negamax(position, history, depth, 0, alpha, beta, &mut iter_pv, true);
 
-        /*
+        if negamax.is_out_of_time() {
+            break;
+        }
+
+        let node_limit_hit = max_nodes > 0 && negamax.node_count >= max_nodes;
+
         // Aspiration windows
-        if depth > 3 {
+        if depth > 4 {
+            ASP_ITERS.fetch_add(1, Ordering::Relaxed);
             if score <= alpha {
-                // alpha -= alpha_window;
-                // alpha_window *= 2;
+                if node_limit_hit {
+                    break;
+                }
                 beta = (alpha + beta) / 2;
                 alpha = std::cmp::max(-MATE_SCORE, alpha - delta);
                 delta += delta / 2;
+                FAIL_LOWS.fetch_add(1, Ordering::Relaxed);
                 continue;
             }
             if score >= beta {
-                // beta += beta_window;
-                // beta_window *= 2;
+                pv = iter_pv; // fail high still has vaild best move
+                if node_limit_hit {
+                    break;
+                }
                 beta = std::cmp::min(MATE_SCORE, beta + delta);
                 delta += delta / 2;
+                FAIL_HIGHS.fetch_add(1, Ordering::Relaxed);
                 continue;
             }
 
-            delta = window_size;
-            alpha = std::cmp::max(-MATE_SCORE, score - delta);
-            beta = std::cmp::min(score + delta, MATE_SCORE);
+            // Reset parameters if search passes
+            delta = WINDOW_SIZE;
+            alpha = std::cmp::max(-MATE_SCORE, score - WINDOW_SIZE);
+            beta = std::cmp::min(score + WINDOW_SIZE, MATE_SCORE);
         }
-        */
+
+        pv = iter_pv; // search passes, so we can update the pv
 
         if !bench {
             let duration = start.elapsed();
             print_info(depth, score, duration, &negamax, &pv);
         }
 
-        if negamax.is_out_of_time() {
-            break;
-        }
-        if max_nodes > 0 && negamax.node_count >= max_nodes {
+        if negamax.is_out_of_time() || node_limit_hit {
             break;
         }
 
