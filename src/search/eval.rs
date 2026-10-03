@@ -227,9 +227,68 @@ pub const MVV_LVA: [[i32; 6]; 6] = {
     table
 };
 
+// Add determinstic RNG noise to prevent local maxima in positions where every move look the same
+// Also, Beal effect means this gives bonuses to positions with more mobility, reducing
+// blunders in drawn endgames due to little mobility
+// https://chessprogramming.org/Search_with_Random_Leaf_Values
+#[inline(always)]
+fn position_jitter(board: &shakmaty::Board) -> i32 {
+    let mut x = board.occupied().0;
+    
+    // Fast integer hash (Wyhash finalizer variant)
+    x ^= x >> 32;
+    x = x.wrapping_mul(0xd6e8_feb8_6659_fd93);
+    x ^= x >> 32;
+    x = x.wrapping_mul(0xd6e8_feb8_6659_fd93);
+    x ^= x >> 32;
+
+    // Map to range [-3, 3]
+    ((x % 7) as i32) - 3
+}
+
+pub fn is_drawn_endgame(position: &Chess) -> bool {
+
+    if position.is_insufficient_material() {
+        return true;
+    }
+
+    let board = position.board();
+
+    if board.queens().is_empty() {
+        let white_pieces = board.by_color(Color::White);
+        let black_pieces = board.by_color(Color::Black);
+
+        let white_knights = (white_pieces & board.knights()).count() as i32;
+        let black_knights = (black_pieces & board.knights()).count() as i32;
+        let white_bishops = (white_pieces & board.bishops()).count() as i32;
+        let black_bishops = (black_pieces & board.bishops()).count() as i32;
+        let white_rooks   = (white_pieces & board.rooks()).count() as i32;
+        let black_rooks   = (black_pieces & board.rooks()).count() as i32;
+
+        let white_balance: i32 = 3 * white_knights + 3 * white_bishops + 5 * white_rooks;
+        let black_balance: i32 = 3 * black_knights + 3 * black_bishops + 5 * black_rooks;
+
+        let net_balance = (white_balance - black_balance).abs();
+        if net_balance <= 3 {
+            return true;
+        }
+    }
+
+    false
+}
+
 pub fn evaluate(position: &Chess) -> i32 {
     let board = position.board();
     let side2move = position.turn() as usize;
+
+    // Drawn endgame detection
+    let pawns_count = board.pawns().count() as i32;
+    if pawns_count == 0 {
+        if is_drawn_endgame(position) {
+            let jitter = position_jitter(position.board());
+            return jitter;
+        }
+    }
 
     // idx 0 for black idx 1 for white
     let mut middlegame_scores: [i32; 2] = [0, 0];
