@@ -4,8 +4,14 @@ use negamax::Negamax;
 use shakmaty::{Chess, Color, Move, Position};
 use std::time::Duration;
 
+use std::sync::atomic::{AtomicUsize, Ordering};
+
 pub mod eval;
 pub mod negamax;
+
+pub static FAIL_LOWS: AtomicUsize = AtomicUsize::new(0);
+pub static FAIL_HIGHS: AtomicUsize = AtomicUsize::new(0);
+pub static ASP_ITERS: AtomicUsize = AtomicUsize::new(0);
 
 pub const MATE_SCORE: i32 = 100_000;
 pub const MATE_THRESHOLD: i32 = MATE_SCORE - 1000;
@@ -84,13 +90,10 @@ pub fn search(
     // let mut alpha_window = 50;
     let mut beta = MATE_SCORE;
     // let mut beta_window = 50;
-    let window_size = 33;
-    let mut delta = window_size;
+    let WINDOW_SIZE = 23;
+    let mut delta = WINDOW_SIZE;
 
     let mut depth = 1;
-
-    // let mut fail_low = 0;
-    // let mut fail_high = 0;
 
     let mut pv = PVariation::default();
     while depth <= max_depth {
@@ -111,6 +114,7 @@ pub fn search(
 
         // Aspiration windows
         if depth > 4 {
+            ASP_ITERS.fetch_add(1, Ordering::Relaxed);
             if score <= alpha {
                 if node_limit_hit {
                     break;
@@ -118,7 +122,7 @@ pub fn search(
                 beta = (alpha + beta) / 2;
                 alpha = std::cmp::max(-MATE_SCORE, alpha - delta);
                 delta += delta / 2;
-                // fail_low += 1;
+                FAIL_LOWS.fetch_add(1, Ordering::Relaxed);
                 continue;
             }
             if score >= beta {
@@ -128,14 +132,14 @@ pub fn search(
                 }
                 beta = std::cmp::min(MATE_SCORE, beta + delta);
                 delta += delta / 2;
-                // fail_high += 1;
+                FAIL_HIGHS.fetch_add(1, Ordering::Relaxed);
                 continue;
             }
 
             // Reset parameters if search passes
-            delta = window_size;
-            alpha = std::cmp::max(-MATE_SCORE, score - window_size);
-            beta = std::cmp::min(score + window_size, MATE_SCORE);
+            delta = WINDOW_SIZE;
+            alpha = std::cmp::max(-MATE_SCORE, score - WINDOW_SIZE);
+            beta = std::cmp::min(score + WINDOW_SIZE, MATE_SCORE);
         }
 
         pv = iter_pv; // search passes, so we can update the pv
@@ -151,8 +155,6 @@ pub fn search(
 
         depth += 1;
     }
-
-    // println!("Fail lows: {fail_low}, fail highs: {fail_high}");
 
     // if negamax failed for whatever reason, then just play the first move in the position
     if pv.line[0].is_none() {

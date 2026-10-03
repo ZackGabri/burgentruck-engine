@@ -1,6 +1,9 @@
 use shakmaty::Chess;
 use shakmaty::fen::Fen;
 
+use crate::search::{ASP_ITERS, FAIL_HIGHS, FAIL_LOWS};
+use std::sync::atomic::Ordering;
+
 use crate::engine_options;
 use crate::search::SearchOptions;
 
@@ -67,6 +70,10 @@ pub fn bench() -> anyhow::Result<()> {
         .set("Hash", &BENCH_HASH.to_string())
         .unwrap();
 
+    FAIL_LOWS.store(0, Ordering::Relaxed);
+    FAIL_HIGHS.store(0, Ordering::Relaxed);
+    ASP_ITERS.store(0, Ordering::Relaxed);
+
     let mut total_nodes = 0;
     let bench_start = minstant::Instant::now();
 
@@ -99,6 +106,15 @@ pub fn bench() -> anyhow::Result<()> {
     let nps = total_nodes * 1000 / bench_duration as usize;
     println!("--------------------------------");
     println!("Total bench duration: {bench_duration}ms");
+
+    let lows = FAIL_LOWS.load(Ordering::Relaxed);
+    let highs = FAIL_HIGHS.load(Ordering::Relaxed);
+    let iters = ASP_ITERS.load(Ordering::Relaxed).max(1);
+    println!(
+        "fail lows {lows}, fail highs {highs}, aspiration iters {iters}, fail rate {:.1}%",
+        (lows + highs) as f64 * 100.0 / iters as f64
+    );
+
     println!("{total_nodes} nodes {nps} nps");
 
     engine_options()
