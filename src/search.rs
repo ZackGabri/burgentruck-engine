@@ -87,10 +87,8 @@ pub fn search(
 
     // aspiration window variables
     let mut alpha = -MATE_SCORE;
-    // let mut alpha_window = 50;
     let mut beta = MATE_SCORE;
-    // let mut beta_window = 50;
-    let WINDOW_SIZE = 23;
+    const WINDOW_SIZE: i32 = 18;
     let mut delta = WINDOW_SIZE;
 
     let mut depth = 1;
@@ -102,8 +100,7 @@ pub fn search(
         }
 
         let mut iter_pv = PVariation::default(); // don't reuse pv from previous iteration, since it 
-                                             // may be invalid if the search fails
-        // println!("depth {depth} alpha {alpha} beta {beta} window {window_size} delta {delta}");
+                                                 // may be invalid if the search fails
         let score = negamax.negamax(position, history, depth, 0, alpha, beta, &mut iter_pv, true);
 
         if negamax.is_out_of_time() {
