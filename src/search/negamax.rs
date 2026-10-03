@@ -224,6 +224,13 @@ impl Negamax {
             depth -= 1;
         }
 
+        if position.is_checkmate() {
+            return -MATE_SCORE + ply as i32;
+        }
+        else if position.is_stalemate() {
+            return 0;
+        }
+
         let mut max = -MATE_SCORE;
         let moves = self.get_sorted_moves(position, ply, &tt_entry.best_move);
 
