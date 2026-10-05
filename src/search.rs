@@ -58,7 +58,7 @@ pub struct SearchOptions {
 
 pub fn search(
     position: &Chess,
-    history: Option<&MoveHistory>,
+    history: Option<&mut MoveHistory>,
     search_options: SearchOptions,
 ) -> (Option<Move>, usize) {
     let SearchOptions {
@@ -80,8 +80,8 @@ pub fn search(
     });
 
     let max_nodes = max_nodes.unwrap_or_default();
-    let default_history = MoveHistory::default();
-    let history = history.unwrap_or(&default_history);
+    let mut default_history = MoveHistory::default();
+    let history = history.unwrap_or(&mut default_history);
 
     let start = minstant::Instant::now();
 
@@ -100,10 +100,13 @@ pub fn search(
         }
 
         let mut iter_pv = PVariation::default(); // don't reuse pv from previous iteration, since it 
-                                                 // may be invalid if the search fails
+        // may be invalid if the search fails
         let score = negamax.negamax(position, history, depth, 0, alpha, beta, &mut iter_pv, true);
 
         if negamax.is_out_of_time() {
+            if depth == 1 {
+                pv = iter_pv;
+            }
             break;
         }
 

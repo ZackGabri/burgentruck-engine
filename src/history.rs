@@ -1,4 +1,4 @@
-use shakmaty::{Chess, zobrist::ZobristHash};
+use shakmaty::{Chess, Position};
 
 use crate::transposition_table::TTHash;
 
@@ -33,15 +33,14 @@ impl MoveHistory {
         self.index = 0;
     }
 
-    pub fn count_item(&self, item: &TTHash) -> usize {
-        let mut count = 0;
+    pub fn hash_exists(&self, item: &TTHash) -> bool {
         for i in 0..self.index {
             if *item == self.history[i] {
-                count += 1;
+                return true;
             }
         }
 
-        count
+        false
     }
 }
 

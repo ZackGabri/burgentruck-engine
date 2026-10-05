@@ -129,7 +129,7 @@ fn main() -> Result<(), anyhow::Error> {
                         .ok(),
                     ..Default::default()
                 };
-                let (m, _) = search::search(&pos, Some(&history), search_options);
+                let (m, _) = search::search(&pos, Some(&mut history), search_options);
 
                 if let Some(best_move) = m {
                     println!("bestmove {}", best_move.to_uci(pos.castles().mode()));
@@ -166,7 +166,7 @@ fn main() -> Result<(), anyhow::Error> {
                     ..Default::default()
                 };
 
-                let (m, _) = search::search(&pos, Some(&history), search_options);
+                let (m, _) = search::search(&pos, Some(&mut history), search_options);
 
                 if let Some(best_move) = m {
                     println!("bestmove {}", best_move.to_uci(pos.castles().mode()));

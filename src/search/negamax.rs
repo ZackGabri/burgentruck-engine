@@ -2,7 +2,6 @@ use std::sync::OnceLock;
 
 use rand::SeedableRng;
 use rand::rngs::SmallRng;
-use shakmaty::zobrist::ZobristHash;
 use shakmaty::{Chess, Move, MoveList, Position};
 
 use crate::history::MoveHistory;
@@ -116,7 +115,7 @@ impl Negamax {
     pub fn negamax(
         &mut self,
         position: &Chess,
-        history: &MoveHistory,
+        history: &mut MoveHistory,
         mut depth: usize,
         ply: usize,
         mut alpha: i32,
@@ -135,12 +134,9 @@ impl Negamax {
         let original_alpha = alpha;
         let hash = position.zobrist_hash(shakmaty::EnPassantMode::Legal);
 
-        let mut history = *history;
-        history.push_hash(hash);
-
-        // threefold detection
-        let count = history.count_item(&hash);
-        if count >= 2 && ply > 0
+        // if hash already exists then this is the second time we're in the position
+        // it's the same as checking if there's 2 hashes in the history
+        if (history.hash_exists(&hash) && ply > 0)
             || position.is_insufficient_material()
             || position.halfmoves() >= 100
         {
@@ -156,7 +152,7 @@ impl Negamax {
 
         pv.length = 0; // ensure fresh pv
         // tt probing and cutoffs
-        if tt_entry.depth >= depth && tt_entry.hash == hash {
+        if tt_entry.depth >= depth && tt_hit {
             match tt_entry.bound {
                 TTBound::Exact => {
                     pv.line[pv.length] = tt_entry.best_move;
@@ -204,7 +200,7 @@ impl Negamax {
                     let null_score = -self.negamax(
                         // search with zero window
                         &null_position,
-                        &history,
+                        history,
                         depth.saturating_sub(reduction),
                         ply + 1,
                         -beta,
@@ -241,9 +237,13 @@ impl Negamax {
             }
         }
 
+        // push current position hash before exploring children
+        history.push_hash(hash);
+
         let mut best_move = None;
         for (move_index, (_, mov)) in moves.into_iter().enumerate() {
             if depth > 1 && self.is_out_of_time() {
+                history.pop();
                 return alpha;
             }
 
@@ -288,7 +288,7 @@ impl Negamax {
                 // Perform zero-window search (ZWS) on non-PV nodes
                 score = -self.negamax(
                     &position,
-                    &history.clone(),
+                    history,
                     depth - lmr_reduction - 1,
                     ply + 1,
                     -alpha - 1,
@@ -301,7 +301,7 @@ impl Negamax {
                 if lmr_reduction > 0 && score > alpha {
                     score = -self.negamax(
                         &position,
-                        &history.clone(),
+                        history,
                         depth - 1,
                         ply + 1,
                         -alpha - 1,
@@ -311,11 +311,12 @@ impl Negamax {
                     );
                 }
             }
+
             // We are in a PV node and either it's the first legal move, OR the ZWS failed high
             if pv_node && (move_index == 0 || score > alpha) {
                 score = -self.negamax(
                     &position,
-                    &history.clone(),
+                    history,
                     depth - 1,
                     ply + 1,
                     -beta,
@@ -355,6 +356,9 @@ impl Negamax {
                 break;
             }
         }
+
+        // backtrack history after exploring this node's branch
+        history.pop();
 
         if replace_tt {
             let bound = if max <= original_alpha {
