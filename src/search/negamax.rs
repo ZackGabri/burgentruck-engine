@@ -240,6 +240,7 @@ impl Negamax {
         // push current position hash before exploring children
         history.push_hash(hash);
 
+        let turn = position.turn();
         let mut best_move = None;
         for (move_index, (_, mov)) in moves.into_iter().enumerate() {
             if depth > 1 && self.is_out_of_time() {
@@ -347,9 +348,8 @@ impl Negamax {
                         None => break,
                     } as usize;
                     let to = mov.to() as usize;
-                    let turn = position.turn() as usize;
 
-                    self.history_table[turn][from][to] += (depth * depth) as i32;
+                    self.history_table[turn as usize][from][to] += (depth * depth) as i32;
                     self.store_killer_move(ply, mov);
                 }
 
