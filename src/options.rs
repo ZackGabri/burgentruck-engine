@@ -15,6 +15,11 @@ pub fn default_options_list() -> &'static Vec<EngineOption<'static>> {
             // The default depth the engine will search to
             EngineOption::new("Default Depth", OptionType::Spin(1..=64, 7)),
             EngineOption::new("Threads", OptionType::Spin(1..=1, 1)),
+            // FERTILITY PRUNING PARAMTERS
+            EngineOption::new("FutilityDepth", OptionType::Spin(1..=8, 3)),
+            EngineOption::new("FutilityMarginPerDepth", OptionType::Spin(0..=1000, 200)),
+            EngineOption::new("FutilityMarginBase", OptionType::Spin(0..=1000, 0)),
+            EngineOption::new("FutilityMoves", OptionType::Spin(0..=67, 4)),
         ]
     })
 }
