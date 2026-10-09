@@ -246,54 +246,36 @@ fn position_jitter(board: &shakmaty::Board) -> i32 {
     ((x % 7) as i32) - 3
 }
 
-#[derive(PartialEq, Eq)]
-enum EndgameType {
-    EasyDraw,
-    HardDraw,
-    Decisive,
-}
-
-fn is_drawn_endgame(position: &Chess) -> EndgameType {
-
+fn is_drawn_endgame(position: &Chess) -> bool {
     if position.is_insufficient_material() {
-        return EndgameType::EasyDraw;
+        return true;
     }
 
     let board = position.board();
 
-    if board.queens().is_empty() {
-        let white_pieces = board.by_color(Color::White);
-        let black_pieces = board.by_color(Color::Black);
-
-        let white_knights = (white_pieces & board.knights()).count() as i32;
-        let black_knights = (black_pieces & board.knights()).count() as i32;
-        let white_bishops = (white_pieces & board.bishops()).count() as i32;
-        let black_bishops = (black_pieces & board.bishops()).count() as i32;
-        let white_rooks   = (white_pieces & board.rooks()).count() as i32;
-        let black_rooks   = (black_pieces & board.rooks()).count() as i32;
-
-        let white_balance: i32 = 30 * white_knights + 35 * white_bishops + 50 * white_rooks;
-        let black_balance: i32 = 30 * black_knights + 35 * black_bishops + 50 * black_rooks;
-
-        let net_balance = (white_balance - black_balance).abs();
-        if net_balance <= 35 {
-            if white_rooks == 0 && black_rooks == 0 {
-                return EndgameType::EasyDraw;
-            }
-            else {
-                // Endgames like R+N v R is technically a draw but requires calculation to hold
-                return EndgameType::HardDraw;
-            }
-        }
-        // KNN vs K, a special case that is drawn despite the material imbalance
-        else if white_bishops + black_bishops + white_rooks + black_rooks == 0
-            && (white_knights == 0 || black_knights == 0)
-            && white_knights + black_knights <= 2 {
-            return EndgameType::EasyDraw;
-        }
+    // We don't handle positions with queens and rooks. Too complicated and won't gain much.
+    if !board.queens().is_empty() || !board.rooks().is_empty() {
+        return false;
     }
 
-    EndgameType::Decisive
+    let white_pieces = board.by_color(Color::White);
+    let black_pieces = board.by_color(Color::Black);
+
+    let white_knights = (white_pieces & board.knights()).count() as i32;
+    let black_knights = (black_pieces & board.knights()).count() as i32;
+    let white_bishops = (white_pieces & board.bishops()).count() as i32;
+    let black_bishops = (black_pieces & board.bishops()).count() as i32;
+
+    // KNN vs K, a special case that is drawn despite the material imbalance
+    if white_bishops + black_bishops == 0
+        && (white_knights == 0 || black_knights == 0)
+        && white_knights + black_knights <= 2 {
+        return true;
+    }
+
+    // General minors-only case
+    let net_balance = (30 * white_knights + 35 * white_bishops - 30 * black_knights - 35 * black_bishops).abs();
+    net_balance <= 35 
 }
 
 pub fn evaluate(position: &Chess) -> i32 {
@@ -302,19 +284,12 @@ pub fn evaluate(position: &Chess) -> i32 {
 
     // Drawn endgame detection
     let pawns_count = board.pawns().count() as i32;
-    let mut endgame_factor = 1;
     if pawns_count == 0 {
-        let endgame_type = is_drawn_endgame(position);
-        if endgame_type == EndgameType::EasyDraw {
+        if is_drawn_endgame(position) {
             // let jitter = position_jitter(position.board());
             // return jitter;
             return 0;
         }
-        /*
-        else if endgame_type == EndgameType::HardDraw {
-            endgame_factor = 8;
-        }
-        */
     }
 
     // idx 0 for black idx 1 for white
@@ -346,5 +321,5 @@ pub fn evaluate(position: &Chess) -> i32 {
     let middlegame_phase = std::cmp::min(64, game_phase);
     let endgame_phase = 64 - middlegame_phase;
 
-    (middlegame_score * middlegame_phase + endgame_score * endgame_phase) / (64 * endgame_factor)
+    (middlegame_score * middlegame_phase + endgame_score * endgame_phase) / 64
 }
