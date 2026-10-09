@@ -234,16 +234,6 @@ impl Negamax {
         let mut max = -MATE_SCORE;
         let moves = self.get_sorted_moves(position, ply, &tt_entry.best_move);
 
-        if moves.is_empty() {
-            if is_check {
-                // checkmate
-                return -MATE_SCORE + ply as i32;
-            } else {
-                // stalemate
-                return 0;
-            }
-        }
-
         // push current position hash before exploring children
         history.push_hash(hash);
 
