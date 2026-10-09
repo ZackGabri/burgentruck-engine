@@ -283,13 +283,10 @@ pub fn evaluate(position: &Chess) -> i32 {
     let side2move = position.turn() as usize;
 
     // Drawn endgame detection
-    let pawns_count = board.pawns().count() as i32;
-    if pawns_count == 0 {
-        if is_drawn_endgame(position) {
-            // let jitter = position_jitter(position.board());
-            // return jitter;
-            return 0;
-        }
+    if board.pawns().is_empty() && is_drawn_endgame(position) {
+        // let jitter = position_jitter(position.board());
+        // return jitter;
+        return 0;
     }
 
     // idx 0 for black idx 1 for white
