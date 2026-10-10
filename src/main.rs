@@ -91,31 +91,33 @@ fn main() -> Result<(), anyhow::Error> {
                             pos.play_unchecked(m);
                             history.push_position(&pos);
                         }
-                        if !moves.is_empty() {
-                            history.pop(); // remove last position to avoid doubling it when running negamax
-                        }
                     }
                 }
                 "fen" => {
                     history.reset();
 
-                    let args: String = args.join(" ");
-                    let split: Vec<&str> = args.split("moves").collect();
+                    let (fen_args, moves) = match args.iter().position(|&s| s == "moves") {
+                        Some(idx) => (&args[..idx], &args[idx + 1..]),
+                        None => (args, &[][..]),
+                    };
 
-                    let fen: Fen = split.first().copied().unwrap_or_default().parse()?;
-                    pos = fen.into_position(pos.castles().mode())?;
+                    let fen_str = fen_args.join(" ");
+                    let fen = fen_str.parse::<Fen>();
+
+                    if fen.is_err() {
+                        println!("invalid fen");
+                        continue;
+                    }
+
+                    pos = fen?.into_position(pos.castles().mode())?;
                     history.push_position(&pos);
 
-                    let moves = split.get(1..).unwrap_or_default();
                     for m in moves {
                         let uci: UciMove = m.trim().parse()?;
                         let m = uci.to_move(&pos)?;
 
                         pos.play_unchecked(m);
                         history.push_position(&pos);
-                    }
-                    if !moves.is_empty() {
-                        history.pop(); // remove last position to avoid doubling it when running negamax
                     }
                 }
                 _ => {}
