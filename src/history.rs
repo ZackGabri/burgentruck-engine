@@ -2,7 +2,7 @@ use shakmaty::{Chess, Position};
 
 use crate::transposition_table::TTHash;
 
-const HISTORY_SIZE: usize = 512;
+const HISTORY_SIZE: usize = 2048;
 
 #[derive(Clone, Copy, Debug)]
 pub struct MoveHistory {
