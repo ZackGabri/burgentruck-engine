@@ -69,6 +69,7 @@ pub fn bench() -> anyhow::Result<()> {
     engine_options()
         .set("Hash", &BENCH_HASH.to_string())
         .unwrap();
+    crate::transposition_table::resize(); // this also clears the existing hash table
 
     FAIL_LOWS.store(0, Ordering::Relaxed);
     FAIL_HIGHS.store(0, Ordering::Relaxed);
@@ -120,6 +121,7 @@ pub fn bench() -> anyhow::Result<()> {
     engine_options()
         .set("Hash", &hash_before_starting.to_string())
         .unwrap();
+    crate::transposition_table::resize();
 
     Ok(())
 }
