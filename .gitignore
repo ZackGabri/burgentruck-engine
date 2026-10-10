@@ -1,2 +1,4 @@
+*.pdb
+*.exe
 flamegraph.svg
 /target
