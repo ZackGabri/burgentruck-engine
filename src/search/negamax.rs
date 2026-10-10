@@ -225,7 +225,6 @@ impl Negamax {
         }
 
         let mut max = -MATE_SCORE;
-        let is_mate = max.abs() >= crate::search::MATE_THRESHOLD;
 
         let moves = self.get_sorted_moves(position, ply, &tt_entry.best_move);
         if moves.is_empty() {
@@ -249,6 +248,7 @@ impl Negamax {
                 return alpha;
             }
 
+            let is_mate = max.abs() >= crate::search::MATE_THRESHOLD;
             let is_quiet = !mov.is_capture() && !mov.is_promotion();
             let is_killer = self.killer_move_table[ply].contains_move(mov);            
 
@@ -283,6 +283,8 @@ impl Negamax {
             // Principal variation search (PVS)
             // If we are in a non-PV node, OR we are in a PV-node examining moves after the 1st legal move
             if !pv_node || move_index > 0 {
+
+                // Late move reductions (LMR)
                 let lmr_conditions = !is_check
                     && depth >= 3
                     && move_index >= 3
